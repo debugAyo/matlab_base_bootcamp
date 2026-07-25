@@ -4,7 +4,7 @@ import io
 import sqlite3
 from datetime import date
 from functools import wraps
-from flask import Flask, request, jsonify, session, redirect, url_for, render_template, send_from_directory
+from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IS_VERCEL = os.environ.get("VERCEL") == "1"
@@ -12,7 +12,7 @@ IS_VERCEL = os.environ.get("VERCEL") == "1"
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 
-app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=PUBLIC_DIR, static_url_path="")
+app = Flask(__name__, template_folder=TEMPLATE_DIR, static_url_path="")
 app.secret_key = os.environ.get("SECRET_KEY", "futminna-matlab-base-2026")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 
@@ -60,17 +60,6 @@ def admin_required(f):
             return redirect(url_for("admin_login"))
         return f(*args, **kwargs)
     return decorated
-
-
-@app.route("/")
-def home():
-    ensure_db()
-    return send_from_directory(PUBLIC_DIR, "index.html")
-
-
-@app.route("/<path:filename>")
-def static_files(filename):
-    return send_from_directory(PUBLIC_DIR, filename)
 
 
 @app.route("/api/register", methods=["POST"])
