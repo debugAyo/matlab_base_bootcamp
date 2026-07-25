@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Login | FUTMinna MATLAB Base</title>
+<style>
+:root {
+  --mw-blue: #00457C; --mw-blue-dark: #002A50; --mw-blue-deeper: #001A35;
+  --mw-blue-light: #0076A8; --mw-teal: #49C3C3; --mw-teal-dark: #0097A7;
+  --mw-yellow: #FFD100; --mw-red: #BE2909; --mw-white: #FFFFFF;
+  --mw-light: #F8FAFC; --mw-border: #E2E8F0; --mw-text: #1E293B;
+  --mw-text-secondary: #64748B; --mw-text-muted: #94A3B8;
+  --mw-shadow-lg: 0 12px 40px rgba(0,0,0,0.1);
+  --mw-radius: 10px; --mw-radius-lg: 16px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--mw-blue-deeper); display: flex; justify-content: center;
+  align-items: center; min-height: 100vh; overflow: hidden; position: relative;
+}
+body::before {
+  content: ''; position: absolute; width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(73,195,195,0.12) 0%, transparent 70%);
+  top: -15%; right: -10%; border-radius: 50%;
+  animation: orbFloat 12s ease-in-out infinite;
+}
+body::after {
+  content: ''; position: absolute; width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(255,209,0,0.06) 0%, transparent 70%);
+  bottom: -15%; left: -8%; border-radius: 50%;
+  animation: orbFloat 12s ease-in-out infinite reverse;
+}
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -40px) scale(1.05); }
+  66% { transform: translate(-20px, 20px) scale(0.95); }
+}
+
+.login-wrapper { width: 100%; max-width: 420px; padding: 24px; position: relative; z-index: 1; }
+.login-card {
+  background: rgba(255,255,255,0.04); backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  padding: 48px 40px; border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.3);
+  text-align: center;
+  animation: cardIn 0.8s var(--ease-spring) both;
+}
+@keyframes cardIn { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.login-logo { margin-bottom: 24px; }
+.login-logo .logo-text { font-size: 1.1rem; font-weight: 800; color: white; letter-spacing: -0.3px; }
+.login-logo .logo-text span { color: var(--mw-teal); }
+.login-logo .logo-sub {
+  font-size: .7rem; color: rgba(255,255,255,0.35); text-transform: uppercase;
+  letter-spacing: 2px; margin-top: 6px; font-weight: 600;
+}
+
+.login-card h1 { font-size: 1.4rem; color: white; margin-bottom: 6px; font-weight: 700; }
+.login-card .subtitle { color: rgba(255,255,255,0.45); font-size: .85rem; margin-bottom: 32px; }
+
+.login-card form { display: flex; flex-direction: column; gap: 18px; text-align: left; }
+.login-card label {
+  font-weight: 600; font-size: .75rem; color: rgba(255,255,255,0.5);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.login-card input {
+  padding: 14px 18px; border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: var(--mw-radius); font-size: .95rem; font-family: inherit;
+  background: rgba(255,255,255,0.05); color: white; transition: all 0.3s var(--ease-out);
+}
+.login-card input:focus {
+  outline: none; border-color: var(--mw-teal); background: rgba(255,255,255,0.08);
+  box-shadow: 0 0 0 4px rgba(73,195,195,0.1);
+}
+.login-card input::placeholder { color: rgba(255,255,255,0.25); }
+
+.login-card button {
+  margin-top: 8px; background: var(--mw-yellow); color: var(--mw-blue-dark);
+  font-weight: 700; padding: 16px; border: none; border-radius: var(--mw-radius);
+  font-size: 1rem; cursor: pointer; transition: all 0.3s var(--ease-out);
+  box-shadow: 0 4px 20px rgba(255,209,0,0.2); position: relative; overflow: hidden;
+}
+.login-card button::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent); opacity: 0;
+  transition: opacity 0.3s;
+}
+.login-card button:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(255,209,0,0.3); }
+.login-card button:hover::before { opacity: 1; }
+
+.error-msg {
+  color: #FCA5A5; font-size: .85rem; font-weight: 500; text-align: center;
+  margin-top: 16px; padding: 12px 16px; background: rgba(239,68,68,0.1);
+  border-radius: var(--mw-radius); border: 1px solid rgba(239,68,68,0.15);
+  animation: msgIn 0.4s var(--ease-spring);
+}
+@keyframes msgIn { from { opacity: 0; transform: translateY(-8px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.divider { height: 1px; background: rgba(255,255,255,0.06); margin: 24px 0 0; }
+.back-link {
+  display: block; margin-top: 18px; color: rgba(255,255,255,0.4); font-size: .85rem;
+  text-decoration: none; font-weight: 500; transition: color 0.2s;
+}
+.back-link:hover { color: var(--mw-teal); }
+.back-link::before { content: '\2190 '; }
+
+@media(max-width: 480px) { .login-card { padding: 36px 24px; } }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="login-wrapper">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-text">FUTMinna <span>MATLAB</span> Base</div>
+      <div class="logo-sub">Administration</div>
+    </div>
+    <h1>Welcome Back</h1>
+    <p class="subtitle">Sign in to access the admin dashboard</p>
+    <form method="POST" action="/admin/login">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Enter admin password" required autofocus>
+      <button type="submit">Sign In</button>
+    </form>
+    {% if error %}
+    <p class="error-msg">{{ error }}</p>
+    {% endif %}
+    <div class="divider"></div>
+    <a href="/" class="back-link">Back to site</a>
+  </div>
+</div>
+</body>
+</html>
