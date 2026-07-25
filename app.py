@@ -6,10 +6,19 @@ from datetime import date
 from functools import wraps
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template, send_from_directory
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IS_VERCEL = os.environ.get("VERCEL") == "1"
+
 app = Flask(__name__, template_folder="templates", static_folder="public", static_url_path="")
 app.secret_key = os.environ.get("SECRET_KEY", "futminna-matlab-base-2026")
-DB = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "registrations.db"))
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
+
+if IS_VERCEL:
+    DB = "/tmp/registrations.db"
+else:
+    DB = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "registrations.db"))
+
+_db_initialized = False
 
 
 def get_db():
@@ -18,35 +27,41 @@ def get_db():
     return conn
 
 
-def init_db():
-    with get_db() as conn:
-        conn.execute("""CREATE TABLE IF NOT EXISTS registrations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fullname TEXT NOT NULL,
-            email TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            level TEXT NOT NULL,
-            department TEXT NOT NULL,
-            expectation TEXT NOT NULL,
-            created_at TEXT DEFAULT (datetime('now', 'localtime'))
-        )""")
-        conn.commit()
+def ensure_db():
+    global _db_initialized
+    if _db_initialized:
+        return
+    try:
+        with get_db() as conn:
+            conn.execute("""CREATE TABLE IF NOT EXISTS registrations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fullname TEXT NOT NULL,
+                email TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                level TEXT NOT NULL,
+                department TEXT NOT NULL,
+                expectation TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )""")
+            conn.commit()
+        _db_initialized = True
+    except Exception as e:
+        print(f"DB init error: {e}")
 
 
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        ensure_db()
         if not session.get("admin"):
             return redirect(url_for("admin_login"))
         return f(*args, **kwargs)
     return decorated
 
 
-init_db()
-
-
 @app.route("/")
 def home():
+    ensure_db()
     return send_from_directory("public", "index.html")
 
 
@@ -57,6 +72,7 @@ def static_files(filename):
 
 @app.route("/api/register", methods=["POST"])
 def register():
+    ensure_db()
     data = request.get_json(force=True)
     required = ["fullname", "email", "phone", "level", "department", "expectation"]
     if not all(data.get(f, "").strip() for f in required):
@@ -74,6 +90,7 @@ def register():
 
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
+    ensure_db()
     error = None
     if request.method == "POST":
         if request.form.get("password") == ADMIN_PASSWORD:
@@ -173,4 +190,5 @@ def export_csv():
 
 
 if __name__ == "__main__":
+    ensure_db()
     app.run(debug=True, port=5000)
