@@ -186,10 +186,10 @@
 
   /* ===== CALENDAR ===== */
   const EVENT = {
-    title: "FUTMinna MATLAB Space",
-    start: "20260817T090000",
-    end: "20260824T160000",
-    location: "Engineering Complex, FUTMinna, Minna, Niger State, Nigeria",
+    title: "FUTMinna MATLAB Bootcamp: Beyond the Code, Decode Our World",
+    start: "20260817T100000",
+    end: "20260824T140000",
+    location: "Nihub Hall, FUTMinna, Minna, Niger State, Nigeria",
     description: "A one-week, MATLAB-based engineering training at Federal University of Technology, Minna. Build real simulations, model physical systems, and earn a certificate."
   };
 
