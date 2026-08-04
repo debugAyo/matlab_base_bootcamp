@@ -34,7 +34,7 @@
         this.vy = (Math.random() - 0.5) * 0.4;
         this.r = Math.random() * 2 + 0.5;
         this.alpha = Math.random() * 0.4 + 0.1;
-        this.color = Math.random() > 0.7 ? "73,195,195" : "255,255,255";
+        this.color = Math.random() > 0.7 ? "243,119,38" : "77,190,238";
       }
       update() {
         this.x += this.vx;
@@ -66,7 +66,7 @@
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(73,195,195,${0.08 * (1 - dist / 140)})`;
+            ctx.strokeStyle = `rgba(243,119,38,${0.08 * (1 - dist / 140)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
@@ -155,12 +155,6 @@
   const submitBtn = document.getElementById("submitBtn");
   const API_URL = "/api/register";
 
-  function saveLocally(data) {
-    const existing = JSON.parse(localStorage.getItem("bootcamp_registrations") || "[]");
-    existing.push({ ...data, timestamp: new Date().toISOString() });
-    localStorage.setItem("bootcamp_registrations", JSON.stringify(existing));
-  }
-
   function showMessage(text, type) {
     msg.textContent = text;
     msg.className = "form-message show " + type;
@@ -192,7 +186,7 @@
 
   /* ===== CALENDAR ===== */
   const EVENT = {
-    title: "FUTMinna MATLAB Base",
+    title: "FUTMinna MATLAB Space",
     start: "20260817T090000",
     end: "20260824T160000",
     location: "Engineering Complex, FUTMinna, Minna, Niger State, Nigeria",
@@ -216,7 +210,7 @@
     const ics = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//FUTMinna MATLAB Base//EN",
+      "PRODID:-//FUTMinna MATLAB Space//EN",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
       "BEGIN:VEVENT",
@@ -229,12 +223,12 @@
       "BEGIN:VALARM",
       "TRIGGER:-P1D",
       "ACTION:DISPLAY",
-      "DESCRIPTION:FUTMinna MATLAB Base starts tomorrow!",
+      "DESCRIPTION:FUTMinna MATLAB Space starts tomorrow!",
       "END:VALARM",
       "BEGIN:VALARM",
       "TRIGGER:-PT1H",
       "ACTION:DISPLAY",
-      "DESCRIPTION:FUTMinna MATLAB Base starts in 1 hour!",
+      "DESCRIPTION:FUTMinna MATLAB Space starts in 1 hour!",
       "END:VALARM",
       "END:VEVENT",
       "END:VCALENDAR"
@@ -244,7 +238,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "futminna-matlab-base.ics";
+    a.download = "futminna-matlab-space.ics";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -279,15 +273,27 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
         });
-        if (!res.ok) throw new Error("Server error");
+
+        if (res.status === 429) {
+          showMessage("Too many attempts. Please wait a minute and try again.", "error");
+          return;
+        }
+
+        if (!res.ok) {
+          let errorText = "Could not save your registration. Please try again.";
+          try {
+            const body = await res.json();
+            if (body.error) errorText = body.error;
+          } catch {}
+          showMessage(errorText, "error");
+          return;
+        }
+
         form.reset();
         msg.className = "form-message";
         openModal(data.fullname);
       } catch {
-        saveLocally(data);
-        form.reset();
-        msg.className = "form-message";
-        openModal(data.fullname);
+        showMessage("Network error. Please check your connection and try again.", "error");
       } finally {
         submitBtn.classList.remove("loading");
       }

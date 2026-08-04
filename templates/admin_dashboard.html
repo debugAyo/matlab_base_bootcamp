@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard | FUTMinna MATLAB Base</title>
+<title>Admin Dashboard | FUTMinna MATLAB Space</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --mw-blue: #00457C; --mw-blue-dark: #002A50; --mw-blue-deeper: #001A35;
-  --mw-blue-light: #0076A8; --mw-teal: #49C3C3; --mw-teal-dark: #0097A7;
-  --mw-yellow: #FFD100; --mw-orange: #E86E05; --mw-red: #BE2909;
+  --mw-blue: #0072BD; --mw-blue-dark: #00427A; --mw-blue-deeper: #001B38;
+  --mw-blue-light: #4DBEEE; --mw-teal: #F37726; --mw-teal-dark: #D55E00;
+  --mw-yellow: #EDB120; --mw-orange: #7E2F8E; --mw-red: #A2142F;
   --mw-white: #FFFFFF; --mw-light: #F8FAFC; --mw-light-gray: #F1F5F9;
   --mw-border: #E2E8F0; --mw-text: #1E293B;
   --mw-text-secondary: #64748B; --mw-text-muted: #94A3B8;
@@ -30,6 +30,11 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
 }
 .topbar h1 { font-size: 1rem; font-weight: 700; letter-spacing: -0.3px; }
 .topbar h1 span { color: var(--mw-teal); }
+.topbar-brand { display: flex; align-items: center; gap: 12px; }
+.topbar-logo {
+  width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
+  border: 2px solid rgba(255,255,255,0.2);
+}
 .topbar nav { display: flex; gap: 10px; align-items: center; }
 .topbar nav a {
   color: rgba(255,255,255,0.7); text-decoration: none; font-size: .82rem; font-weight: 500;
@@ -75,7 +80,7 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
   background: var(--mw-light);
 }
 .controls input:focus, .controls select:focus {
-  outline: none; border-color: var(--mw-teal); box-shadow: 0 0 0 3px rgba(73,195,195,0.08);
+  outline: none; border-color: var(--mw-teal); box-shadow: 0 0 0 3px rgba(243,119,38,0.08);
   background: white;
 }
 .controls input[type="text"] { min-width: 280px; flex: 1; }
@@ -133,19 +138,41 @@ tbody tr:hover { background: #F0F7FF; }
 .empty-state a { color: var(--mw-blue-light); text-decoration: none; font-weight: 600; }
 .empty-state a:hover { text-decoration: underline; }
 
+/* Pagination */
+.pagination {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+  margin-top: 20px; background: white; padding: 16px 24px;
+  border-radius: var(--mw-radius-lg); border: 1px solid var(--mw-border); box-shadow: var(--mw-shadow);
+}
+.pagination-info { font-size: .85rem; color: var(--mw-text-secondary); font-weight: 500; }
+.pagination-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.page-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 38px;
+  padding: 0 12px; border-radius: var(--mw-radius); border: 1.5px solid var(--mw-border);
+  background: var(--mw-light); color: var(--mw-blue-dark); font-weight: 600; font-size: .85rem;
+  text-decoration: none; transition: all 0.2s var(--ease-out);
+}
+.page-btn:hover { border-color: var(--mw-teal); color: var(--mw-blue-light); transform: translateY(-1px); }
+.page-btn.active { background: var(--mw-blue); border-color: var(--mw-blue); color: white; }
+.page-btn.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
 @media(max-width: 768px) {
   .topbar { flex-direction: column; height: auto; padding: 14px 4%; gap: 10px; }
   .controls { flex-direction: column; }
   .controls input[type="text"] { min-width: 100%; }
   .btn-export { margin-left: 0; width: 100%; justify-content: center; }
   .stats { grid-template-columns: 1fr; }
+  .pagination { flex-direction: column; align-items: flex-start; }
 }
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <h1>FUTMinna <span>MATLAB</span> Base &mdash; Dashboard</h1>
+  <div class="topbar-brand">
+    <img class="topbar-logo" src="/images/futminna_matlab_space_logo.jpeg" alt="FUTMinna MATLAB Space logo">
+    <h1>FUTMinna <span>MATLAB</span> Space &mdash; Dashboard</h1>
+  </div>
   <nav>
     <a href="/" class="site-link">View Site</a>
     <a href="/admin/logout" class="logout-btn">Sign Out</a>
@@ -222,6 +249,25 @@ tbody tr:hover { background: #F0F7FF; }
         {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  <div class="pagination">
+    <span class="pagination-info">Showing {{ (page - 1) * per_page + 1 }}&ndash;{{ [page * per_page, total] | min }} of {{ total }}</span>
+    <div class="pagination-btns">
+      {% if has_prev %}
+      <a class="page-btn" href="/admin?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}{% if level_filter %}&level={{ level_filter }}{% endif %}{% if dept_filter %}&department={{ dept_filter }}{% endif %}">&laquo; Prev</a>
+      {% else %}
+      <span class="page-btn disabled">&laquo; Prev</span>
+      {% endif %}
+      {% for p in page_range %}
+      <a class="page-btn {% if p == page %}active{% endif %}" href="/admin?page={{ p }}{% if search %}&search={{ search }}{% endif %}{% if level_filter %}&level={{ level_filter }}{% endif %}{% if dept_filter %}&department={{ dept_filter }}{% endif %}">{{ p }}</a>
+      {% endfor %}
+      {% if has_next %}
+      <a class="page-btn" href="/admin?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}{% if level_filter %}&level={{ level_filter }}{% endif %}{% if dept_filter %}&department={{ dept_filter }}{% endif %}">Next &raquo;</a>
+      {% else %}
+      <span class="page-btn disabled">Next &raquo;</span>
+      {% endif %}
+    </div>
   </div>
   {% else %}
   <div class="empty-state">
