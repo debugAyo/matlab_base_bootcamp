@@ -186,7 +186,7 @@
 
   /* ===== CALENDAR ===== */
   const EVENT = {
-    title: "FUTMinna MATLAB Bootcamp: Beyond the Code, Decode Our World",
+    title: "FUTMinna MATLAB Bootcamp: Beyond the Code, Decode Your World",
     start: "20260817T100000",
     end: "20260824T140000",
     location: "Nihub Hall, FUTMinna, Minna, Niger State, Nigeria",
