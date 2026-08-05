@@ -6,11 +6,11 @@
 <title>Admin Login | Beyond the Code, Decode Your World</title>
 <style>
 :root {
-  --mw-blue: #0072BD; --mw-blue-dark: #00427A; --mw-blue-deeper: #001B38;
-  --mw-blue-light: #4DBEEE; --mw-teal: #F37726; --mw-teal-dark: #D55E00;
-  --mw-yellow: #EDB120; --mw-red: #A2142F; --mw-white: #FFFFFF;
-  --mw-light: #F8FAFC; --mw-border: #E2E8F0; --mw-text: #1E293B;
-  --mw-text-secondary: #64748B; --mw-text-muted: #94A3B8;
+  --mw-blue: #0747A3; --mw-blue-dark: #052F6B; --mw-blue-deeper: #000000;
+  --mw-blue-light: #4E9BF0; --mw-teal: #D6300C; --mw-teal-dark: #FF6B3D;
+  --mw-yellow: #F26A43; --mw-red: #A2142F; --mw-white: #FFFFFF;
+  --mw-light: #0A1629; --mw-border: rgba(148,163,184,0.18); --mw-text: #E7EDF6;
+  --mw-text-secondary: #A6B4CA; --mw-text-muted: #6B7C96;
   --mw-shadow-lg: 0 12px 40px rgba(0,0,0,0.1);
   --mw-radius: 10px; --mw-radius-lg: 16px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -19,18 +19,22 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: var(--mw-blue-deeper); display: flex; justify-content: center;
-  align-items: center; min-height: 100vh; overflow: hidden; position: relative;
+  background:
+    linear-gradient(180deg, rgba(3,11,24,0.78) 0%, rgba(3,11,24,0.6) 50%, rgba(3,11,24,0.85) 100%),
+    url('/images/decode-your-world-bg.jpg') center/cover no-repeat fixed;
+  background-size: cover;
+  display: flex; justify-content: center;
+  align-items: center; min-height: 100vh; min-height: 100svh; overflow: hidden; position: relative;
 }
 body::before {
   content: ''; position: absolute; width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(243,119,38,0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(214,48,12,0.12) 0%, transparent 70%);
   top: -15%; right: -10%; border-radius: 50%;
   animation: orbFloat 12s ease-in-out infinite;
 }
 body::after {
   content: ''; position: absolute; width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(77,190,238,0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(7,71,163,0.08) 0%, transparent 70%);
   bottom: -15%; left: -8%; border-radius: 50%;
   animation: orbFloat 12s ease-in-out infinite reverse;
 }
@@ -55,7 +59,7 @@ body::after {
 .login-logo { margin-bottom: 24px; }
 .login-logo .login-logo-img {
   width: 72px; height: 72px; border-radius: 50%; object-fit: cover; margin-bottom: 14px;
-  border: 2px solid rgba(243,119,38,0.4); box-shadow: 0 0 30px rgba(243,119,38,0.3);
+  border: 2px solid rgba(214,48,12,0.4); box-shadow: 0 0 30px rgba(214,48,12,0.3);
 }
 .login-logo .logo-text { font-size: 1.1rem; font-weight: 800; color: white; letter-spacing: -0.3px; }
 .login-logo .logo-text span { color: var(--mw-teal); }
@@ -79,22 +83,22 @@ body::after {
 }
 .login-card input:focus {
   outline: none; border-color: var(--mw-teal); background: rgba(255,255,255,0.08);
-  box-shadow: 0 0 0 4px rgba(243,119,38,0.1);
+  box-shadow: 0 0 0 4px rgba(214,48,12,0.1);
 }
 .login-card input::placeholder { color: rgba(255,255,255,0.25); }
 
 .login-card button {
-  margin-top: 8px; background: var(--mw-yellow); color: var(--mw-blue-dark);
+  margin-top: 8px; background: var(--mw-yellow); color: #FFFFFF;
   font-weight: 700; padding: 16px; border: none; border-radius: var(--mw-radius);
   font-size: 1rem; cursor: pointer; transition: all 0.3s var(--ease-out);
-  box-shadow: 0 4px 20px rgba(237,177,32,0.2); position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(214,48,12,0.2); position: relative; overflow: hidden;
 }
 .login-card button::before {
   content: ''; position: absolute; inset: 0;
   background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent); opacity: 0;
   transition: opacity 0.3s;
 }
-.login-card button:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(237,177,32,0.3); }
+.login-card button:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(214,48,12,0.3); }
 .login-card button:hover::before { opacity: 1; }
 
 .error-msg {
