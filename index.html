@@ -32,6 +32,7 @@
     <nav id="navLinks">
       <a href="#about">About</a>
       <a href="#tracks">Tracks</a>
+      <a href="#venue">Venue</a>
       <a href="#register" class="nav-cta">Register Now</a>
       <a href="/admin" class="nav-admin">Admin</a>
     </nav>
@@ -53,7 +54,28 @@
       <a href="#register" class="btn-glow">Register Now</a>
       <a href="#about" class="btn-ghost">Learn More <span class="arrow">&darr;</span></a>
     </div>
-    <div class="hero-stats reveal reveal-delay-4">
+    <div class="hero-countdown reveal reveal-delay-4">
+      <p class="countdown-label" id="countdownLabel">Bootcamp starts in</p>
+      <div class="countdown-grid" id="countdown">
+        <div class="countdown-box">
+          <span class="countdown-num" id="cd-days">00</span>
+          <span class="countdown-unit">Days</span>
+        </div>
+        <div class="countdown-box">
+          <span class="countdown-num" id="cd-hours">00</span>
+          <span class="countdown-unit">Hours</span>
+        </div>
+        <div class="countdown-box">
+          <span class="countdown-num" id="cd-minutes">00</span>
+          <span class="countdown-unit">Minutes</span>
+        </div>
+        <div class="countdown-box">
+          <span class="countdown-num" id="cd-seconds">00</span>
+          <span class="countdown-unit">Seconds</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-stats reveal reveal-delay-5">
       <div class="hero-stat">
         <span class="hero-stat-num">500+</span>
         <span class="hero-stat-label">Expected Reach</span>
@@ -131,6 +153,49 @@
       <div class="track-pill">Mathematics & Statistics</div>
       <div class="track-pill">Agriculture</div>
       <div class="track-pill">All Faculties</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== VENUE ===== -->
+<section id="venue" class="venue">
+  <div class="container">
+    <div class="section-label reveal">Venue</div>
+    <h2 class="reveal">Where You'll <span class="gradient-text">Learn</span></h2>
+    <p class="section-desc reveal">The bootcamp holds at FUTMinna's innovation hub &mdash; an event space built for hands-on tech training, right on the Gidan Kwano campus.</p>
+
+    <div class="venue-grid">
+      <div class="venue-card reveal">
+        <div class="venue-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <h3>NIHUB Hall</h3>
+        <p class="venue-sub">FUTMinna's IT &amp; Innovation hub</p>
+        <ul class="venue-list">
+          <li>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4h6v4"/></svg>
+            <span><strong>Venue:</strong> NIHUB Building Event Hall</span>
+          </li>
+          <li>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span><strong>Landmark:</strong> Beside the UBA ATM Bay</span>
+          </li>
+          <li>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20z"/><path d="M2 12h20"/></svg>
+            <span><strong>Campus:</strong> Gidan Kwano (Main Campus), FUTMinna</span>
+          </li>
+          <li>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-5.1-7-11a7 7 0 0 1 14 0c0 5.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+            <span><strong>City:</strong> Minna, Niger State, Nigeria</span>
+          </li>
+        </ul>
+        <a href="https://www.google.com/maps/dir/?api=1&amp;destination=NIHUB+FUTMinna+Gidan+Kwano" target="_blank" rel="noopener" class="btn-glow">Get Directions</a>
+      </div>
+      <div class="venue-map reveal reveal-delay-1">
+        <iframe src="https://maps.google.com/maps?q=NIHUB%20FUTMinna%20Gidan%20Kwano&amp;t=&amp;z=15&amp;ie=UTF8&amp;iwloc=&amp;output=embed"
+          title="Map to NIHUB Hall, Gidan Kwano Campus, FUTMinna"
+          allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
     </div>
   </div>
 </section>
@@ -239,7 +304,7 @@
       </div>
       <div class="modal-detail">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-        <span><strong>Venue:</strong> Nihub Hall, FUTMinna, Minna, Niger State</span>
+        <span><strong>Venue:</strong> NIHUB Hall, Beside UBA ATM Bay, Gidan Kwano Campus, FUTMinna</span>
       </div>
     </div>
 

@@ -149,6 +149,35 @@
   }, { threshold: 0.5 });
   statNums.forEach(el => counterObserver.observe(el));
 
+  /* ===== COUNTDOWN — TO BOOTCAMP START (Aug 17, 2026, 10:00 WAT) ===== */
+  const cdDays = document.getElementById("cd-days");
+  const cdHours = document.getElementById("cd-hours");
+  const cdMinutes = document.getElementById("cd-minutes");
+  const cdSeconds = document.getElementById("cd-seconds");
+  const countdownLabel = document.getElementById("countdownLabel");
+  const BOOTCAMP_START = new Date("2026-08-17T09:00:00Z");
+  const pad2 = n => String(n).padStart(2, "0");
+  let countdownTimer;
+
+  function updateCountdown() {
+    const diff = BOOTCAMP_START - new Date();
+    if (diff <= 0) {
+      clearInterval(countdownTimer);
+      if (countdownLabel) countdownLabel.textContent = "The bootcamp is live!";
+      [cdDays, cdHours, cdMinutes, cdSeconds].forEach(el => { if (el) el.textContent = "00"; });
+      return;
+    }
+    if (cdDays) cdDays.textContent = pad2(Math.floor(diff / 86400000));
+    if (cdHours) cdHours.textContent = pad2(Math.floor((diff % 86400000) / 3600000));
+    if (cdMinutes) cdMinutes.textContent = pad2(Math.floor((diff % 3600000) / 60000));
+    if (cdSeconds) cdSeconds.textContent = pad2(Math.floor((diff % 60000) / 1000));
+  }
+
+  if (cdDays && cdHours && cdMinutes && cdSeconds) {
+    updateCountdown();
+    countdownTimer = setInterval(updateCountdown, 1000);
+  }
+
   /* ===== FORM SUBMISSION ===== */
   const form = document.getElementById("registerForm");
   const msg = document.getElementById("formMessage");
@@ -189,7 +218,7 @@
     title: "FUTMinna MATLAB Bootcamp: Beyond the Code, Decode Your World",
     start: "20260817T100000",
     end: "20260824T140000",
-    location: "Nihub Hall, FUTMinna, Minna, Niger State, Nigeria",
+    location: "NIHUB Hall, Beside UBA ATM Bay, Gidan Kwano Campus, FUTMinna, Minna, Niger State, Nigeria",
     description: "A one-week, MATLAB-based engineering training at Federal University of Technology, Minna. Build real simulations, model physical systems, and earn a certificate."
   };
 
