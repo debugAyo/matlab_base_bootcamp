@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard | FUTMinna MATLAB Space</title>
+<title>Attendance | FUTMinna MATLAB Space</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -35,10 +35,7 @@ body {
 .topbar h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
 .topbar h1 span { color: var(--mw-teal); }
 .topbar-brand { display: flex; align-items: center; gap: 14px; }
-.topbar-logo {
-  width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
-  border: 2px solid rgba(255,255,255,0.2);
-}
+.topbar-logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.2); }
 .topbar nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .topbar nav a {
   color: rgba(255,255,255,0.7); text-decoration: none; font-size: .88rem; font-weight: 500;
@@ -48,16 +45,14 @@ body {
 .topbar nav a.site-link { border: 1px solid rgba(255,255,255,0.15); }
 .topbar nav a.active-link { background: rgba(255,255,255,0.12); color: white; }
 .topbar nav a.logout-btn { background: var(--mw-red); color: white; font-weight: 600; }
-.topbar nav a.logout-btn:hover { background: #9B1B07; }
 
 .container { max-width: 1340px; margin: 0 auto; padding: 32px 4% 52px; }
 
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 22px; margin-bottom: 32px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 22px; margin-bottom: 32px; }
 .stat-card {
-  background: rgba(255,255,255,0.05); padding: 34px 28px; border-radius: var(--mw-radius-lg);
+  background: rgba(255,255,255,0.05); padding: 30px 26px; border-radius: var(--mw-radius-lg);
   border: 1px solid var(--mw-border); text-align: center;
-  transition: all 0.3s var(--ease-out); position: relative; overflow: hidden;
-  backdrop-filter: blur(12px);
+  transition: all 0.3s var(--ease-out); position: relative; overflow: hidden; backdrop-filter: blur(12px);
 }
 .stat-card::before {
   content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
@@ -66,29 +61,47 @@ body {
 .stat-card:nth-child(2)::before { background: linear-gradient(90deg, var(--mw-teal), var(--mw-yellow)); }
 .stat-card:nth-child(3)::before { background: linear-gradient(90deg, var(--mw-orange), var(--mw-blue-light)); }
 .stat-card:hover { transform: translateY(-4px); box-shadow: var(--mw-shadow-lg); }
-.stat-card .number { font-size: 3rem; font-weight: 800; color: var(--mw-blue-light); line-height: 1; }
+.stat-card .number { font-size: 2.8rem; font-weight: 800; color: var(--mw-blue-light); line-height: 1; }
 .stat-card:nth-child(2) .number { color: var(--mw-teal-dark); }
 .stat-card:nth-child(3) .number { color: var(--mw-yellow); }
 .stat-card .label { font-size: .82rem; color: var(--mw-text-muted); margin-top: 10px;
   text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+
+.day-selector {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px;
+  background: rgba(255,255,255,0.05); padding: 22px 26px; border-radius: var(--mw-radius-lg);
+  border: 1px solid var(--mw-border); backdrop-filter: blur(12px); align-items: center;
+}
+.day-selector label { font-weight: 600; font-size: .95rem; color: var(--mw-text-secondary); margin-right: 10px; }
+.day-btn {
+  padding: 12px 20px; border-radius: var(--mw-radius); border: 1.5px solid var(--mw-border);
+  background: rgba(255,255,255,0.05); color: var(--mw-text); font-weight: 600; font-size: .88rem;
+  cursor: pointer; transition: all 0.25s var(--ease-out); font-family: inherit;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+}
+.day-btn:hover { border-color: var(--mw-teal); color: var(--mw-teal-dark); transform: translateY(-1px); }
+.day-btn.active { background: var(--mw-blue); border-color: var(--mw-blue); color: white; }
+.day-btn .count {
+  background: rgba(255,255,255,0.15); padding: 3px 10px; border-radius: 20px;
+  font-size: .78rem; font-weight: 700;
+}
+.day-btn.active .count { background: rgba(255,255,255,0.25); }
 
 .controls {
   display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; align-items: center;
   background: rgba(255,255,255,0.05); padding: 22px 26px; border-radius: var(--mw-radius-lg);
   box-shadow: var(--mw-shadow); border: 1px solid var(--mw-border); backdrop-filter: blur(12px);
 }
-.controls input, .controls select {
+.controls input {
   padding: 13px 18px; border: 1.5px solid var(--mw-border); border-radius: var(--mw-radius);
   font-size: .95rem; font-family: inherit; transition: all 0.25s var(--ease-out);
-  background: rgba(10,22,41,0.6); color: var(--mw-text);
+  background: rgba(10,22,41,0.6); color: var(--mw-text); min-width: 300px; flex: 1;
 }
-.controls input:focus, .controls select:focus {
+.controls input:focus {
   outline: none; border-color: var(--mw-teal); box-shadow: 0 0 0 3px rgba(214,48,12,0.12);
   background: rgba(255,255,255,0.08);
 }
 .controls input::placeholder { color: var(--mw-text-muted); }
-.controls input[type="text"] { min-width: 300px; flex: 1; }
-.controls select { min-width: 160px; }
 .btn-filter {
   background: var(--mw-blue); color: white; padding: 13px 24px; border: none;
   border-radius: var(--mw-radius); font-weight: 600; font-size: .95rem; cursor: pointer;
@@ -101,13 +114,17 @@ body {
   transition: all 0.25s var(--ease-out); text-decoration: none; font-family: inherit;
 }
 .btn-clear:hover { background: #9B1B07; }
-.btn-export {
-  margin-left: auto; background: var(--mw-teal-dark); color: white; padding: 13px 24px;
-  border: none; border-radius: var(--mw-radius); font-weight: 600; font-size: .95rem;
-  cursor: pointer; text-decoration: none; transition: all 0.25s var(--ease-out);
-  display: flex; align-items: center; gap: 8px; font-family: inherit;
+
+.btn-group { margin-left: auto; display: flex; gap: 10px; }
+.btn-import, .btn-export-day {
+  padding: 13px 24px; border: none; border-radius: var(--mw-radius); font-weight: 600;
+  font-size: .95rem; cursor: pointer; text-decoration: none; transition: all 0.25s var(--ease-out);
+  display: flex; align-items: center; gap: 8px; font-family: inherit; color: white;
 }
-.btn-export:hover { background: #B72408; transform: translateY(-1px); }
+.btn-import { background: var(--mw-teal-dark); }
+.btn-import:hover { background: #B72408; transform: translateY(-1px); }
+.btn-export-day { background: var(--mw-blue); }
+.btn-export-day:hover { background: var(--mw-blue-light); transform: translateY(-1px); }
 
 .table-wrap {
   background: rgba(255,255,255,0.05); border-radius: var(--mw-radius-lg); box-shadow: var(--mw-shadow);
@@ -122,40 +139,34 @@ th {
   color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
 }
 td {
-  padding: 16px 22px; border-bottom: 1px solid rgba(148,163,184,0.15); font-size: .95rem;
-  transition: background 0.15s;
+  padding: 16px 22px; border-bottom: 1px solid rgba(148,163,184,0.15); font-size: .95rem; transition: background 0.15s;
 }
 tr:last-child td { border-bottom: none; }
 tbody tr { transition: all 0.2s var(--ease-out); }
 tbody tr:hover { background: rgba(59,130,214,0.14); }
+tbody tr.attended { background: rgba(34,197,94,0.08); }
+tbody tr.attended:hover { background: rgba(34,197,94,0.14); }
 .name-cell { font-weight: 600; color: white; }
 .email-cell { color: var(--mw-blue-light); font-weight: 500; }
 .phone-cell { font-family: 'SF Mono', 'Consolas', monospace; font-size: .88rem; color: var(--mw-text-muted); }
 .dept-cell { font-weight: 500; }
-.date-cell { color: var(--mw-text-muted); font-size: .88rem; white-space: nowrap; }
+
+.attendance-toggle { position: relative; width: 52px; height: 28px; cursor: pointer; }
+.attendance-toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: rgba(255,255,255,0.1);
+  border: 1.5px solid var(--mw-border); border-radius: 28px; transition: all 0.3s var(--ease-out);
+}
+.toggle-slider::before {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  background: var(--mw-text-muted); border-radius: 50%; transition: all 0.3s var(--ease-out);
+}
+.attendance-toggle input:checked + .toggle-slider { background: #22c55e; border-color: #22c55e; }
+.attendance-toggle input:checked + .toggle-slider::before { transform: translateX(24px); background: white; }
 
 .empty-state { text-align: center; padding: 80px 20px; }
 .empty-state h3 { color: white; font-size: 1.25rem; margin-bottom: 10px; }
 .empty-state p { color: var(--mw-text-muted); font-size: .95rem; }
-.empty-state a { color: var(--mw-blue-light); text-decoration: none; font-weight: 600; }
-.empty-state a:hover { text-decoration: underline; }
-
-.pagination {
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
-  margin-top: 22px; background: rgba(255,255,255,0.05); padding: 18px 26px;
-  border-radius: var(--mw-radius-lg); border: 1px solid var(--mw-border); box-shadow: var(--mw-shadow);
-}
-.pagination-info { font-size: .92rem; color: var(--mw-text-secondary); font-weight: 500; }
-.pagination-btns { display: flex; gap: 8px; flex-wrap: wrap; }
-.page-btn {
-  display: inline-flex; align-items: center; justify-content: center; min-width: 42px; height: 42px;
-  padding: 0 14px; border-radius: var(--mw-radius); border: 1.5px solid var(--mw-border);
-  background: rgba(255,255,255,0.05); color: white; font-weight: 600; font-size: .92rem;
-  text-decoration: none; transition: all 0.2s var(--ease-out);
-}
-.page-btn:hover { border-color: var(--mw-teal); color: var(--mw-teal-dark); transform: translateY(-1px); }
-.page-btn.active { background: var(--mw-blue); border-color: var(--mw-blue); color: white; }
-.page-btn.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 
 .modal-overlay {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
@@ -174,27 +185,59 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
   font-size: 1.6rem; cursor: pointer; line-height: 1; padding: 4px;
 }
 .modal-close:hover { color: white; }
-.form-group { margin-bottom: 18px; }
-.form-group label {
-  display: block; font-weight: 600; font-size: .88rem; color: var(--mw-text-secondary); margin-bottom: 8px;
+
+.modal-tabs { display: flex; gap: 4px; margin-bottom: 22px; background: rgba(0,0,0,0.2); border-radius: var(--mw-radius); padding: 4px; }
+.modal-tab {
+  flex: 1; padding: 12px 18px; border: none; background: transparent; color: var(--mw-text-muted);
+  font-weight: 600; font-size: .88rem; border-radius: 8px; cursor: pointer;
+  transition: all 0.25s var(--ease-out); font-family: inherit;
 }
-.form-group input, .form-group select {
+.modal-tab.active { background: var(--mw-blue); color: white; }
+.modal-tab:hover:not(.active) { color: white; background: rgba(255,255,255,0.05); }
+
+.import-panel { display: none; }
+.import-panel.active { display: block; }
+.import-panel p { color: var(--mw-text-secondary); font-size: .92rem; margin-bottom: 18px; line-height: 1.5; }
+
+.form-group { margin-bottom: 18px; }
+.form-group label { display: block; font-weight: 600; font-size: .88rem; color: var(--mw-text-secondary); margin-bottom: 8px; }
+.form-group select {
   width: 100%; padding: 13px 18px; border: 1.5px solid var(--mw-border); border-radius: var(--mw-radius);
   font-size: .95rem; font-family: inherit; background: rgba(10,22,41,0.6); color: var(--mw-text);
-  transition: all 0.25s var(--ease-out);
 }
-.form-group input:focus, .form-group select:focus {
-  outline: none; border-color: var(--mw-teal); box-shadow: 0 0 0 3px rgba(214,48,12,0.12);
+.form-group select:focus { outline: none; border-color: var(--mw-teal); }
+
+.file-upload {
+  border: 2px dashed var(--mw-border); border-radius: var(--mw-radius-lg);
+  padding: 36px 22px; text-align: center; cursor: pointer; transition: all 0.25s var(--ease-out); position: relative;
 }
-.form-group input::placeholder { color: var(--mw-text-muted); }
+.file-upload:hover { border-color: var(--mw-teal); background: rgba(255,255,255,0.03); }
+.file-upload input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.file-upload-text { color: var(--mw-text-muted); font-size: .95rem; }
+.file-upload-text strong { color: var(--mw-teal-dark); }
+.file-upload-name { color: var(--mw-blue-light); font-weight: 600; margin-top: 10px; font-size: .92rem; }
+
 .btn-submit {
   width: 100%; padding: 15px 24px; border: none; border-radius: var(--mw-radius);
   background: var(--mw-teal-dark); color: white; font-weight: 700; font-size: 1rem;
-  cursor: pointer; transition: all 0.25s var(--ease-out); font-family: inherit; margin-top: 8px;
+  cursor: pointer; transition: all 0.25s var(--ease-out); font-family: inherit; margin-top: 14px;
 }
 .btn-submit:hover { background: #B72408; transform: translateY(-1px); }
 .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
+.import-result {
+  margin-top: 18px; padding: 16px 20px; border-radius: var(--mw-radius);
+  font-size: .92rem; font-weight: 500; display: none;
+}
+.import-result.success { display: block; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; }
+.import-result.error { display: block; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #f87171; }
+
+.register-mode-toggle {
+  margin-bottom: 20px; padding: 14px 18px; border-radius: var(--mw-radius);
+  background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2);
+  color: #4ade80; font-size: .88rem; font-weight: 500; display: none;
+}
+.register-mode-toggle.active { display: block; }
 .search-results {
   max-height: 200px; overflow-y: auto; border: 1px solid var(--mw-border);
   border-radius: var(--mw-radius); margin-top: 8px; display: none;
@@ -209,15 +252,7 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
 .search-item:hover { background: rgba(59,130,214,0.14); }
 .search-item .si-name { font-weight: 600; color: white; }
 .search-item .si-detail { font-size: .82rem; color: var(--mw-text-muted); margin-top: 2px; }
-.search-empty {
-  padding: 16px 18px; color: var(--mw-text-muted); font-size: .88rem; text-align: center;
-}
-.register-mode-toggle {
-  margin-bottom: 20px; padding: 14px 18px; border-radius: var(--mw-radius);
-  background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2);
-  color: #4ade80; font-size: .88rem; font-weight: 500; display: none;
-}
-.register-mode-toggle.active { display: block; }
+.search-empty { padding: 16px 18px; color: var(--mw-text-muted); font-size: .88rem; text-align: center; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
 .toast {
@@ -233,12 +268,13 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
   .topbar { flex-direction: column; height: auto; padding: 14px 4%; gap: 10px; }
   .topbar h1 { font-size: .95rem; }
   .controls { flex-direction: column; align-items: stretch; }
-  .controls input[type="text"] { min-width: 100%; }
-  .btn-export { margin-left: 0; width: 100%; justify-content: center; }
+  .controls input { min-width: 100%; }
+  .btn-group { margin-left: 0; width: 100%; }
+  .btn-import, .btn-export-day { flex: 1; justify-content: center; }
   .stats { grid-template-columns: 1fr; }
-  .pagination { flex-direction: column; align-items: flex-start; }
+  .day-selector { flex-direction: column; align-items: stretch; }
   .table-wrap { overflow-x: auto; }
-  .table-wrap table { min-width: 760px; }
+  .table-wrap table { min-width: 640px; }
   .container { padding: 20px 4% 36px; }
   .form-row { grid-template-columns: 1fr; }
 }
@@ -249,11 +285,11 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
 <div class="topbar">
   <div class="topbar-brand">
     <img class="topbar-logo" src="/images/futminna_matlab_space_logo.jpeg" alt="FUTMinna MATLAB Space logo">
-    <h1>FUTMinna <span>MATLAB</span> Space &mdash; Dashboard</h1>
+    <h1>FUTMinna <span>MATLAB</span> Space &mdash; Attendance</h1>
   </div>
   <nav>
-    <a href="/admin" class="active-link">Registrations</a>
-    <a href="/admin/attendance">Attendance</a>
+    <a href="/admin" class="site-link">Registrations</a>
+    <a href="/admin/attendance" class="active-link">Attendance</a>
     {% if admin_role == 'super_admin' %}
     <a href="/admin/manage-admins">Manage Admins</a>
     {% endif %}
@@ -266,41 +302,47 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
 <div class="container">
   <div class="stats">
     <div class="stat-card">
-      <div class="number">{{ total }}</div>
-      <div class="label">Total Registrations</div>
+      <div class="number">{{ total_registered }}</div>
+      <div class="label">Total Registered</div>
     </div>
     <div class="stat-card">
-      <div class="number">{{ today_count }}</div>
-      <div class="label">Registered Today</div>
+      <div class="number">{{ attended_count }}</div>
+      <div class="label">Attended {{ day_info.label.split(' - ')[0] }}</div>
     </div>
     <div class="stat-card">
-      <div class="number">{{ unique_depts }}</div>
-      <div class="label">Departments</div>
+      <div class="number">{{ ((attended_count / total_registered * 100) | round(1)) if total_registered > 0 else 0 }}%</div>
+      <div class="label">Attendance Rate</div>
     </div>
   </div>
 
-  <form class="controls" method="GET" action="/admin">
-    <input type="text" name="search" placeholder="Search name, email, phone, department..." value="{{ search }}">
-    <select name="level">
-      <option value="">All Levels</option>
-      {% for l in ["100","200","300","400","500","Postgraduate"] %}
-      <option value="{{ l }}" {% if level_filter == l %}selected{% endif %}>{{ l }} Level</option>
-      {% endfor %}
-    </select>
-    <select name="department">
-      <option value="">All Departments</option>
-      {% for d in departments %}
-      <option value="{{ d }}" {% if dept_filter == d %}selected{% endif %}>{{ d }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit" class="btn-filter">Apply Filters</button>
-    {% if search or level_filter or dept_filter %}
-    <a href="/admin" class="btn-clear">Clear</a>
-    {% endif %}
-    <a href="/admin/export?{% if search %}search={{ search }}&{% endif %}{% if level_filter %}level={{ level_filter }}&{% endif %}{% if dept_filter %}department={{ dept_filter }}{% endif %}" class="btn-export">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Export CSV
+  <div class="day-selector">
+    <label>Select Day:</label>
+    {% for d in days %}
+    <a href="/admin/attendance?day={{ d.number }}{% if search %}&search={{ search }}{% endif %}"
+       class="day-btn {% if d.number == selected_day %}active{% endif %}">
+      {{ d.label.split(' - ')[0] }}
+      <span class="count">{{ day_counts.get(d.number, 0) }}</span>
     </a>
+    {% endfor %}
+  </div>
+
+  <form class="controls" method="GET" action="/admin/attendance">
+    <input type="hidden" name="day" value="{{ selected_day }}">
+    <input type="text" name="search" placeholder="Search name, email, phone..." value="{{ search }}">
+    <button type="submit" class="btn-filter">Search</button>
+    {% if search %}
+    <a href="/admin/attendance?day={{ selected_day }}" class="btn-clear">Clear</a>
+    {% endif %}
+    <div class="btn-group">
+      <button type="button" class="btn-import" onclick="openImportModal()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import Excel
+      </button>
+      <a href="/admin/attendance/export/{{ selected_day }}" class="btn-export-day">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Day {{ selected_day }}
+      </a>
+    </div>
   </form>
 
   {% if rows %}
@@ -314,55 +356,75 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
           <th>Phone</th>
           <th>Level</th>
           <th>Department</th>
-          <th>Expectation</th>
-          <th>Registered</th>
+          <th>Present</th>
         </tr>
       </thead>
       <tbody>
         {% for r in rows %}
-        <tr>
-          <td>{{ r[0] }}</td>
+        <tr class="{% if r[6] %}attended{% endif %}" id="row-{{ r[0] }}">
+          <td>{{ loop.index }}</td>
           <td class="name-cell">{{ r[1] }}</td>
           <td class="email-cell">{{ r[2] }}</td>
           <td class="phone-cell">{{ r[3] }}</td>
           <td>{{ r[4] }}</td>
           <td class="dept-cell">{{ r[5] }}</td>
-          <td>{{ r[6] }}</td>
-          <td class="date-cell">{{ r[7] }}</td>
+          <td>
+            <label class="attendance-toggle">
+              <input type="checkbox" {% if r[6] %}checked{% endif %}
+                     onchange="toggleAttendance({{ r[0] }}, this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-
-  <div class="pagination">
-    <span class="pagination-info">Showing {{ (page - 1) * per_page + 1 }}&ndash;{{ [page * per_page, total] | min }} of {{ total }}</span>
-    <div class="pagination-btns">
-      {% if has_prev %}
-      <a class="page-btn" href="/admin?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}{% if level_filter %}&level={{ level_filter }}{% endif %}{% if dept_filter %}&department={{ dept_filter }}{% endif %}">&laquo; Prev</a>
-      {% else %}
-      <span class="page-btn disabled">&laquo; Prev</span>
-      {% endif %}
-      {% for p in page_range %}
-      <a class="page-btn {% if p == page %}active{% endif %}" href="/admin?page={{ p }}{% if search %}&search={{ search }}{% endif %}{% if level_filter %}&level={{ level_filter }}{% endif %}{% if dept_filter %}&department={{ dept_filter }}{% endif %}">{{ p }}</a>
-      {% endfor %}
-      {% if has_next %}
-      <a class="page-btn" href="/admin?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}{% if level_filter %}&level={{ level_filter }}{% endif %}{% if dept_filter %}&department={{ dept_filter }}{% endif %}">Next &raquo;</a>
-      {% else %}
-      <span class="page-btn disabled">Next &raquo;</span>
-      {% endif %}
-    </div>
-  </div>
   {% else %}
   <div class="empty-state">
-    <h3>No registrations found</h3>
-    {% if search or level_filter or dept_filter %}
-    <p>Try adjusting your filters or <a href="/admin">clearing them</a>.</p>
-    {% else %}
-    <p>Registrations will appear here once participants sign up.</p>
-    {% endif %}
+    <h3>No registered participants found</h3>
+    <p>Register participants first, then mark their attendance here.</p>
   </div>
   {% endif %}
+</div>
+
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeImportModal()">&times;</button>
+    <h2>Import from Excel</h2>
+
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchTab('registrations')">New Registrations</button>
+      <button class="modal-tab" onclick="switchTab('attendance')">Daily Attendance</button>
+    </div>
+
+    <div class="import-panel active" id="panel-registrations">
+      <p>Upload an Excel file with participant details. Required columns: <strong>name</strong> and <strong>phone</strong>. Optional: department, level, expectation, email.</p>
+      <form id="importRegForm" enctype="multipart/form-data">
+        <div class="file-upload">
+          <input type="file" name="file" accept=".xlsx,.xls" onchange="handleFileSelect(this, 'regFileLabel')">
+          <div class="file-upload-text"><strong>Click to upload</strong> or drag and drop<br><small>.xlsx files only</small></div>
+          <div class="file-upload-name" id="regFileLabel"></div>
+        </div>
+        <button type="submit" class="btn-submit">Import Registrations</button>
+      </form>
+      <div class="import-result" id="regResult"></div>
+    </div>
+
+    <div class="import-panel" id="panel-attendance">
+      <p>Upload an Excel file with names of people who attended <strong>{{ day_info.label }}</strong>. Required column: <strong>name</strong>. Optional: email, phone for better matching.</p>
+      <form id="importAttForm" enctype="multipart/form-data">
+        <input type="hidden" name="day_number" value="{{ selected_day }}">
+        <div class="file-upload">
+          <input type="file" name="file" accept=".xlsx,.xls" onchange="handleFileSelect(this, 'attFileLabel')">
+          <div class="file-upload-text"><strong>Click to upload</strong> or drag and drop<br><small>.xlsx files only</small></div>
+          <div class="file-upload-name" id="attFileLabel"></div>
+        </div>
+        <button type="submit" class="btn-submit">Import Attendance</button>
+      </form>
+      <div class="import-result" id="attResult"></div>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="registerModal">
@@ -447,6 +509,81 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
 </button>
 
 <script>
+const CURRENT_DAY = {{ selected_day }};
+
+function toggleAttendance(regId, isPresent) {
+  const endpoint = isPresent ? '/admin/attendance/mark' : '/admin/attendance/unmark';
+  fetch(endpoint, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({registration_id: regId, day_number: CURRENT_DAY})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { showToast(data.error, 'error'); }
+    else {
+      const row = document.getElementById('row-' + regId);
+      if (row) {
+        if (isPresent) row.classList.add('attended');
+        else row.classList.remove('attended');
+      }
+      showToast(isPresent ? 'Marked present' : 'Removed', 'success');
+    }
+  })
+  .catch(() => showToast('Network error', 'error'));
+}
+
+function openImportModal() { document.getElementById('importModal').classList.add('active'); }
+function closeImportModal() { document.getElementById('importModal').classList.remove('active'); }
+
+function switchTab(tab) {
+  document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.import-panel').forEach(p => p.classList.remove('active'));
+  if (tab === 'registrations') {
+    document.querySelectorAll('.modal-tab')[0].classList.add('active');
+    document.getElementById('panel-registrations').classList.add('active');
+  } else {
+    document.querySelectorAll('.modal-tab')[1].classList.add('active');
+    document.getElementById('panel-attendance').classList.add('active');
+  }
+}
+
+function handleFileSelect(input, labelId) {
+  document.getElementById(labelId).textContent = input.files[0] ? input.files[0].name : '';
+}
+
+document.getElementById('importRegForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const btn = this.querySelector('.btn-submit');
+  const result = document.getElementById('regResult');
+  const fd = new FormData(this);
+  btn.disabled = true; btn.textContent = 'Importing...'; result.className = 'import-result';
+  fetch('/admin/import/registrations', {method: 'POST', body: fd})
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { result.className = 'import-result error'; result.textContent = data.error; }
+      else { result.className = 'import-result success'; result.textContent = data.message; }
+    })
+    .catch(() => { result.className = 'import-result error'; result.textContent = 'Network error.'; })
+    .finally(() => { btn.disabled = false; btn.textContent = 'Import Registrations'; });
+});
+
+document.getElementById('importAttForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const btn = this.querySelector('.btn-submit');
+  const result = document.getElementById('attResult');
+  const fd = new FormData(this);
+  btn.disabled = true; btn.textContent = 'Importing...'; result.className = 'import-result';
+  fetch('/admin/import/attendance', {method: 'POST', body: fd})
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { result.className = 'import-result error'; result.textContent = data.error; }
+      else { result.className = 'import-result success'; result.textContent = data.message; }
+    })
+    .catch(() => { result.className = 'import-result error'; result.textContent = 'Network error.'; })
+    .finally(() => { btn.disabled = false; btn.textContent = 'Import Attendance'; });
+});
+
 function openRegisterModal() {
   document.getElementById('registerModal').classList.add('active');
   document.getElementById('regSearchInput').focus();
@@ -492,39 +629,24 @@ function selectUser(name, email, phone) {
 
 document.getElementById('quickRegForm').addEventListener('submit', function(e) {
   e.preventDefault();
-  const form = this;
   const btn = document.getElementById('regSubmitBtn');
   const data = {};
-  new FormData(form).forEach((v, k) => data[k] = v);
-
-  btn.disabled = true;
-  btn.textContent = 'Registering...';
-
+  new FormData(this).forEach((v, k) => data[k] = v);
+  btn.disabled = true; btn.textContent = 'Registering...';
   fetch('/api/admin/register-user', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(data)
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
   })
   .then(r => r.json())
   .then(data => {
-    if (data.error) {
-      showToast(data.error, 'error');
-    } else {
-      showToast('Participant registered successfully!', 'success');
-      form.reset();
-      document.getElementById('searchResults').innerHTML = '';
-    }
+    if (data.error) { showToast(data.error, 'error'); }
+    else { showToast('Participant registered successfully!', 'success'); this.reset(); document.getElementById('searchResults').innerHTML = ''; }
   })
   .catch(() => showToast('Network error', 'error'))
-  .finally(() => {
-    btn.disabled = false;
-    btn.textContent = 'Register Participant';
-  });
+  .finally(() => { btn.disabled = false; btn.textContent = 'Register Participant'; });
 });
 
-document.getElementById('registerModal').addEventListener('click', function(e) {
-  if (e.target === this) closeRegisterModal();
-});
+document.getElementById('importModal').addEventListener('click', function(e) { if (e.target === this) closeImportModal(); });
+document.getElementById('registerModal').addEventListener('click', function(e) { if (e.target === this) closeRegisterModal(); });
 
 function showToast(msg, type) {
   const t = document.getElementById('toast');

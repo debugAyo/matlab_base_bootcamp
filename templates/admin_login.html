@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Login | Beyond the Code, Decode Your World</title>
+<title>Admin Login | FUTMinna MATLAB Space</title>
 <style>
 :root {
   --mw-blue: #0747A3; --mw-blue-dark: #052F6B; --mw-blue-deeper: #000000;
@@ -87,6 +87,15 @@ body::after {
 }
 .login-card input::placeholder { color: rgba(255,255,255,0.25); }
 
+.pw-wrap { position: relative; }
+.pw-wrap input { width: 100%; padding-right: 48px; }
+.pw-toggle {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; padding: 4px;
+  color: rgba(255,255,255,0.4); transition: color 0.2s; display: flex;
+}
+.pw-toggle:hover { color: white; }
+
 .login-card button {
   margin-top: 8px; background: var(--mw-yellow); color: #FFFFFF;
   font-weight: 700; padding: 16px; border: none; border-radius: var(--mw-radius);
@@ -132,8 +141,15 @@ body::after {
     <h1>Welcome Back</h1>
     <p class="subtitle">Sign in to access the admin dashboard</p>
     <form method="POST" action="/admin/login">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" placeholder="Enter username" required autofocus>
       <label for="password">Password</label>
-      <input type="password" id="password" name="password" placeholder="Enter admin password" required autofocus>
+      <div class="pw-wrap">
+        <input type="password" id="password" name="password" placeholder="Enter password" required>
+        <button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show password">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
       <button type="submit">Sign In</button>
     </form>
     {% if error %}
@@ -143,5 +159,17 @@ body::after {
     <a href="/" class="back-link">Back to site</a>
   </div>
 </div>
+<script>
+function togglePw(id, btn) {
+  const inp = document.getElementById(id);
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    btn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  } else {
+    inp.type = 'password';
+    btn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  }
+}
+</script>
 </body>
 </html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Admins | FUTMinna MATLAB Space</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --mw-blue: #0747A3; --mw-blue-dark: #052F6B; --mw-blue-deeper: #000000;
+  --mw-blue-light: #4E9BF0; --mw-teal: #D6300C; --mw-teal-dark: #FF6B3D;
+  --mw-yellow: #F26A43; --mw-orange: #D6300C; --mw-red: #A2142F;
+  --mw-white: #FFFFFF; --mw-light: #0A1629; --mw-light-gray: #0E1F3B;
+  --mw-border: rgba(148,163,184,0.18); --mw-text: #E7EDF6;
+  --mw-text-secondary: #A6B4CA; --mw-text-muted: #6B7C96;
+  --mw-shadow: 0 4px 20px rgba(0,0,0,0.25); --mw-shadow-lg: 0 12px 40px rgba(0,0,0,0.35);
+  --mw-radius: 10px; --mw-radius-lg: 16px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif; color: var(--mw-text);
+  background:
+    linear-gradient(180deg, rgba(3,11,24,0.9) 0%, rgba(10,22,41,0.82) 50%, rgba(3,11,24,0.92) 100%),
+    url('/images/decode-your-world-bg.jpg') center/cover no-repeat fixed;
+  background-size: cover; min-height: 100vh;
+}
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 4%; height: 64px;
+  background: linear-gradient(135deg, var(--mw-blue-deeper), var(--mw-blue-dark));
+  color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.topbar h1 { font-size: 1rem; font-weight: 700; }
+.topbar h1 span { color: var(--mw-teal); }
+.topbar-brand { display: flex; align-items: center; gap: 12px; }
+.topbar-logo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.2); }
+.topbar nav { display: flex; gap: 10px; align-items: center; }
+.topbar nav a {
+  color: rgba(255,255,255,0.7); text-decoration: none; font-size: .82rem; font-weight: 500;
+  padding: 8px 16px; border-radius: 8px; transition: all 0.25s var(--ease-out);
+}
+.topbar nav a:hover { color: white; background: rgba(255,255,255,0.08); }
+.topbar nav a.site-link { border: 1px solid rgba(255,255,255,0.15); }
+.topbar nav a.active-link { background: rgba(255,255,255,0.12); color: white; }
+.topbar nav a.logout-btn { background: var(--mw-red); color: white; font-weight: 600; }
+
+.container { max-width: 800px; margin: 40px auto; padding: 0 4% 48px; }
+.page-card {
+  background: rgba(255,255,255,0.05); border-radius: var(--mw-radius-lg);
+  border: 1px solid var(--mw-border); padding: 40px; box-shadow: var(--mw-shadow);
+  backdrop-filter: blur(12px); margin-bottom: 24px;
+}
+.page-card h2 { font-size: 1.5rem; margin-bottom: 8px; color: white; }
+.page-card .subtitle { color: var(--mw-text-muted); font-size: .92rem; margin-bottom: 28px; }
+
+.admins-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }
+.admin-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px; border-radius: var(--mw-radius);
+  background: rgba(255,255,255,0.03); border: 1px solid var(--mw-border);
+  transition: all 0.2s var(--ease-out);
+}
+.admin-item:hover { background: rgba(255,255,255,0.06); }
+.admin-info { display: flex; align-items: center; gap: 14px; }
+.admin-avatar {
+  width: 42px; height: 42px; border-radius: 50%; background: var(--mw-blue);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1rem; color: white;
+}
+.admin-name { font-weight: 600; font-size: 1rem; color: white; }
+.admin-meta { font-size: .82rem; color: var(--mw-text-muted); margin-top: 2px; }
+.role-badge {
+  padding: 5px 14px; border-radius: 20px; font-size: .75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.role-badge.super_admin { background: rgba(214,48,12,0.15); color: var(--mw-teal-dark); border: 1px solid rgba(214,48,12,0.3); }
+.role-badge.admin { background: rgba(78,155,240,0.15); color: var(--mw-blue-light); border: 1px solid rgba(78,155,240,0.3); }
+.btn-delete {
+  background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #f87171;
+  padding: 8px 16px; border-radius: var(--mw-radius); font-weight: 600; font-size: .82rem;
+  cursor: pointer; transition: all 0.25s var(--ease-out); font-family: inherit;
+}
+.btn-delete:hover { background: rgba(239,68,68,0.2); }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-group { margin-bottom: 18px; }
+.form-group label {
+  display: block; font-weight: 600; font-size: .88rem; color: var(--mw-text-secondary); margin-bottom: 8px;
+}
+.form-group input, .form-group select {
+  width: 100%; padding: 14px 18px; border: 1.5px solid var(--mw-border); border-radius: var(--mw-radius);
+  font-size: 1rem; font-family: inherit; background: rgba(10,22,41,0.6); color: var(--mw-text);
+  transition: all 0.25s var(--ease-out);
+}
+.form-group input:focus, .form-group select:focus {
+  outline: none; border-color: var(--mw-teal); box-shadow: 0 0 0 3px rgba(214,48,12,0.12);
+}
+.form-group input::placeholder { color: var(--mw-text-muted); }
+
+.pw-wrap { position: relative; }
+.pw-wrap input { width: 100%; padding-right: 48px; }
+.pw-toggle {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; padding: 4px;
+  color: var(--mw-text-muted); transition: color 0.2s; display: flex;
+}
+.pw-toggle:hover { color: white; }
+
+.btn-create {
+  width: 100%; padding: 15px 24px; border: none; border-radius: var(--mw-radius);
+  background: var(--mw-teal-dark); color: white; font-weight: 700; font-size: 1rem;
+  cursor: pointer; transition: all 0.25s var(--ease-out); font-family: inherit;
+}
+.btn-create:hover { background: #B72408; transform: translateY(-1px); }
+
+.msg {
+  margin-bottom: 20px; padding: 14px 18px; border-radius: var(--mw-radius);
+  font-size: .92rem; font-weight: 500;
+}
+.msg.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.15); color: #FCA5A5; }
+.msg.success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.15); color: #4ade80; }
+
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 14px 22px; border-radius: var(--mw-radius);
+  font-weight: 600; font-size: .88rem; z-index: 2000; opacity: 0; transform: translateY(20px);
+  transition: all 0.35s var(--ease-out); pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { background: #22c55e; color: white; }
+.toast.error { background: var(--mw-red); color: white; }
+
+@media(max-width: 768px) {
+  .topbar { flex-direction: column; height: auto; padding: 14px 4%; gap: 10px; }
+  .page-card { padding: 28px 20px; }
+  .form-row { grid-template-columns: 1fr; }
+  .admin-item { flex-direction: column; gap: 12px; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-brand">
+    <img class="topbar-logo" src="/images/futminna_matlab_space_logo.jpeg" alt="FUTMinna MATLAB Space logo">
+    <h1>FUTMinna <span>MATLAB</span> Space &mdash; Manage Admins</h1>
+  </div>
+  <nav>
+    <a href="/admin" class="site-link">Dashboard</a>
+    <a href="/admin/attendance">Attendance</a>
+    <a href="/admin/change-password">Change Password</a>
+    <a href="/admin/logout" class="logout-btn">Sign Out</a>
+  </nav>
+</div>
+
+<div class="container">
+  <div class="page-card">
+    <h2>Current Admins</h2>
+    <p class="subtitle">Manage admin accounts and their roles</p>
+
+    <div class="admins-list">
+      {% for a in admins %}
+      <div class="admin-item" id="admin-{{ a[0] }}">
+        <div class="admin-info">
+          <div class="admin-avatar">{{ a[1][0] | upper }}</div>
+          <div>
+            <div class="admin-name">{{ a[1] }}</div>
+            <div class="admin-meta">Created {{ a[3] }}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="role-badge {{ a[2] }}">{{ a[2] | replace('_', ' ') }}</span>
+          <button class="btn-delete" onclick="deleteAdmin({{ a[0] }}, '{{ a[1] }}')">Delete</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="page-card">
+    <h2>Create New Admin</h2>
+    <p class="subtitle">Add a new admin account. Regular admins can manage registrations and attendance.</p>
+
+    <form id="createAdminForm">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" name="username" placeholder="e.g. john" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <div class="pw-wrap">
+            <input type="password" name="password" id="newAdminPw" placeholder="Min 6 characters" required>
+            <button type="button" class="pw-toggle" onclick="togglePw('newAdminPw', this)" aria-label="Show password">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Role</label>
+        <select name="role">
+          <option value="admin">Admin (manage registrations & attendance)</option>
+          <option value="super_admin">Super Admin (full access)</option>
+        </select>
+      </div>
+      <button type="submit" class="btn-create">Create Admin Account</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+document.getElementById('createAdminForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const form = this;
+  const btn = form.querySelector('.btn-create');
+  const fd = new FormData(form);
+  const data = {};
+  fd.forEach((v, k) => data[k] = v);
+
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+
+  fetch('/admin/create-admin', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      showToast(data.message, 'success');
+      form.reset();
+      setTimeout(() => location.reload(), 1200);
+    }
+  })
+  .catch(() => showToast('Network error', 'error'))
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Create Admin Account';
+  });
+});
+
+function deleteAdmin(id, username) {
+  if (!confirm('Delete admin "' + username + '"? This cannot be undone.')) return;
+
+  fetch('/admin/delete-admin', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({admin_id: id})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      showToast('Admin deleted', 'success');
+      const el = document.getElementById('admin-' + id);
+      if (el) el.remove();
+    }
+  })
+  .catch(() => showToast('Network error', 'error'));
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function togglePw(id, btn) {
+  const inp = document.getElementById(id);
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    btn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  } else {
+    inp.type = 'password';
+    btn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  }
+}
+</script>
+</body>
+</html>
