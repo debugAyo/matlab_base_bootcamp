@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Certificates | FUTMinna MATLAB Space</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --mw-blue: #0747A3; --mw-blue-dark: #052F6B; --mw-blue-deeper: #000000;
+  --mw-blue-light: #4E9BF0; --mw-teal: #D6300C; --mw-teal-dark: #FF6B3D;
+  --mw-yellow: #F26A43; --mw-orange: #D6300C; --mw-red: #A2142F;
+  --mw-white: #FFFFFF; --mw-light: #0A1629; --mw-light-gray: #0E1F3B;
+  --mw-border: rgba(148,163,184,0.18); --mw-text: #E7EDF6;
+  --mw-text-secondary: #A6B4CA; --mw-text-muted: #6B7C96;
+  --mw-shadow: 0 4px 20px rgba(0,0,0,0.25); --mw-shadow-lg: 0 12px 40px rgba(0,0,0,0.35);
+  --mw-radius: 10px; --mw-radius-lg: 16px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --green: #22c55e; --green-soft: rgba(34,197,94,0.1);
+  --red-soft: rgba(239,68,68,0.1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif; color: var(--mw-text);
+  background:
+    linear-gradient(180deg, rgba(3,11,24,0.9) 0%, rgba(10,22,41,0.82) 50%, rgba(3,11,24,0.92) 100%),
+    url('/images/decode-your-world-bg.jpg') center/cover no-repeat fixed;
+  background-size: cover; min-height: 100vh;
+}
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 4%; height: 70px;
+  background: linear-gradient(135deg, var(--mw-blue-deeper), var(--mw-blue-dark));
+  color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); backdrop-filter: blur(10px);
+}
+.topbar h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
+.topbar h1 span { color: var(--mw-teal); }
+.topbar-brand { display: flex; align-items: center; gap: 14px; }
+.topbar-logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.2); }
+.topbar nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.topbar nav a {
+  color: rgba(255,255,255,0.7); text-decoration: none; font-size: .88rem; font-weight: 500;
+  padding: 9px 18px; border-radius: 8px; transition: all 0.25s var(--ease-out); white-space: nowrap;
+}
+.topbar nav a:hover { color: white; background: rgba(255,255,255,0.08); }
+.topbar nav a.site-link { border: 1px solid rgba(255,255,255,0.15); }
+.topbar nav a.active-link { background: rgba(255,255,255,0.12); color: white; }
+.topbar nav a.logout-btn { background: var(--mw-red); color: white; font-weight: 600; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 32px 4% 52px; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 22px; margin-bottom: 28px; }
+.stat-card {
+  background: rgba(255,255,255,0.05); padding: 28px 24px; border-radius: var(--mw-radius-lg);
+  border: 1px solid var(--mw-border); text-align: center;
+  transition: all 0.3s var(--ease-out); position: relative; overflow: hidden; backdrop-filter: blur(12px);
+}
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--mw-blue), var(--mw-teal));
+}
+.stat-card:nth-child(2)::before { background: linear-gradient(90deg, var(--mw-teal), var(--mw-yellow)); }
+.stat-card:nth-child(3)::before { background: linear-gradient(90deg, var(--mw-orange), var(--mw-blue-light)); }
+.stat-card .number { font-size: 2.6rem; font-weight: 800; color: var(--mw-blue-light); line-height: 1; }
+.stat-card:nth-child(2) .number { color: var(--mw-teal-dark); }
+.stat-card:nth-child(3) .number { color: var(--mw-yellow); }
+.stat-card .label { font-size: .8rem; color: var(--mw-text-muted); margin-top: 10px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+
+.setup-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 22px; margin-bottom: 28px; }
+.panel {
+  background: rgba(255,255,255,0.05); border: 1px solid var(--mw-border); border-radius: var(--mw-radius-lg);
+  padding: 26px; backdrop-filter: blur(12px); box-shadow: var(--mw-shadow);
+}
+.panel h2 { font-size: 1.1rem; color: white; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+.panel h2 .num { width: 26px; height: 26px; border-radius: 50%; background: var(--mw-blue); color: white; font-size: .8rem; display: inline-flex; align-items: center; justify-content: center; }
+
+.warn {
+  padding: 14px 18px; border-radius: var(--mw-radius); font-size: .88rem; margin-bottom: 18px; font-weight: 500;
+}
+.warn.error { background: var(--red-soft); border: 1px solid rgba(239,68,68,0.3); color: #f87171; }
+.warn.info { background: rgba(78,155,240,0.1); border: 1px solid rgba(78,155,240,0.3); color: #4E9BF0; }
+.warn.success { background: var(--green-soft); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-weight: 600; font-size: .86rem; color: var(--mw-text-secondary); margin-bottom: 7px; }
+.form-group input[type="text"], .form-group input[type="number"], .form-group select {
+  width: 100%; padding: 12px 16px; border: 1.5px solid var(--mw-border); border-radius: var(--mw-radius);
+  font-size: .93rem; font-family: inherit; background: rgba(10,22,41,0.6); color: var(--mw-text);
+  transition: all 0.25s var(--ease-out);
+}
+.form-group input:focus, .form-group select:focus {
+  outline: none; border-color: var(--mw-teal); box-shadow: 0 0 0 3px rgba(214,48,12,0.12);
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.file-upload {
+  border: 2px dashed var(--mw-border); border-radius: var(--mw-radius-lg);
+  padding: 30px 18px; text-align: center; cursor: pointer; transition: all 0.25s var(--ease-out); position: relative; margin-bottom: 16px;
+}
+.file-upload:hover { border-color: var(--mw-teal); background: rgba(255,255,255,0.03); }
+.file-upload input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.file-upload-text { color: var(--mw-text-muted); font-size: .92rem; }
+.file-upload-text strong { color: var(--mw-teal-dark); }
+.file-upload-name { color: var(--mw-blue-light); font-weight: 600; margin-top: 10px; font-size: .9rem; }
+
+.btn {
+  padding: 12px 20px; border: none; border-radius: var(--mw-radius); font-weight: 600;
+  font-size: .92rem; cursor: pointer; transition: all 0.25s var(--ease-out); font-family: inherit;
+  color: white; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+}
+.btn-teal { background: var(--mw-teal-dark); }
+.btn-teal:hover { background: #B72408; transform: translateY(-1px); }
+.btn-blue { background: var(--mw-blue); }
+.btn-blue:hover { background: var(--mw-blue-light); transform: translateY(-1px); }
+.btn-green { background: var(--green); }
+.btn-green:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-ghost { background: rgba(255,255,255,0.08); border: 1px solid var(--mw-border); }
+.btn-ghost:hover { background: rgba(255,255,255,0.14); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.preview-box {
+  border: 1px solid var(--mw-border); border-radius: var(--mw-radius); overflow: hidden;
+  background: #fff; display: flex; align-items: center; justify-content: center; min-height: 220px; margin-bottom: 14px; position: relative;
+}
+.preview-box img { width: 100%; display: block; }
+.preview-missing { color: var(--mw-text-muted); font-size: .9rem; padding: 30px; text-align: center; }
+
+.controls-bar {
+  display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center;
+  background: rgba(255,255,255,0.05); padding: 18px 22px; border-radius: var(--mw-radius-lg);
+  border: 1px solid var(--mw-border); box-shadow: var(--mw-shadow); backdrop-filter: blur(12px);
+}
+.controls-bar .meta { margin-right: auto; color: var(--mw-text-muted); font-size: .86rem; }
+
+.table-wrap {
+  background: rgba(255,255,255,0.05); border-radius: var(--mw-radius-lg); box-shadow: var(--mw-shadow);
+  border: 1px solid var(--mw-border); overflow: hidden; backdrop-filter: blur(12px);
+  animation: tableIn 0.6s var(--ease-out) both;
+}
+@keyframes tableIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+table { width: 100%; border-collapse: collapse; }
+thead { background: linear-gradient(135deg, var(--mw-blue-deeper), var(--mw-blue-dark)); }
+th {
+  padding: 16px 18px; text-align: left; font-weight: 600; font-size: .78rem;
+  color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
+}
+td { padding: 14px 18px; border-bottom: 1px solid rgba(148,163,184,0.15); font-size: .9rem; transition: background 0.15s; }
+tr:last-child td { border-bottom: none; }
+tbody tr { transition: all 0.2s var(--ease-out); }
+tbody tr:hover { background: rgba(59,130,214,0.14); }
+.name-cell { font-weight: 600; color: white; }
+.email-cell { color: var(--mw-blue-light); font-weight: 500; }
+
+.day-dots { display: flex; gap: 4px; align-items: center; }
+.day-dot {
+  width: 18px; height: 18px; border-radius: 4px; font-size: .65rem; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--mw-border); color: var(--mw-text-muted); background: rgba(255,255,255,0.03);
+}
+.day-dot.on { background: var(--green); border-color: var(--green); color: white; }
+
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: .78rem; font-weight: 700; }
+.badge.ok { background: var(--green-soft); border: 1px solid rgba(34,197,94,0.35); color: #4ade80; }
+.badge.no { background: var(--red-soft); border: 1px solid rgba(239,68,68,0.35); color: #f87171; }
+.badge.warn { background: rgba(244,114,182,0.1); border: 1px solid rgba(244,114,182,0.3); color: #f472b6; }
+
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.mini-btn {
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--mw-border); font-size: .78rem;
+  font-weight: 600; cursor: pointer; transition: all 0.2s var(--ease-out); font-family: inherit;
+  background: rgba(255,255,255,0.05); color: white; text-decoration: none; white-space: nowrap;
+}
+.mini-btn:hover { border-color: var(--mw-teal); color: var(--mw-teal-dark); transform: translateY(-1px); }
+.mini-btn.primary { background: var(--mw-blue); border-color: var(--mw-blue); }
+.mini-btn.primary:hover { background: var(--mw-blue-light); color: white; }
+.mini-btn.green { background: var(--green); border-color: var(--green); color: white; }
+.mini-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.empty-state { text-align: center; padding: 70px 20px; }
+.empty-state h3 { color: white; font-size: 1.2rem; margin-bottom: 10px; }
+.empty-state p { color: var(--mw-text-muted); font-size: .92rem; }
+
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 14px 22px; border-radius: var(--mw-radius);
+  font-weight: 600; font-size: .92rem; z-index: 2000; opacity: 0; transform: translateY(20px);
+  transition: all 0.35s var(--ease-out); pointer-events: none; max-width: 420px;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { background: #22c55e; color: white; }
+.toast.error { background: var(--mw-red); color: white; }
+
+@media(max-width: 900px) {
+  .topbar { flex-direction: column; height: auto; padding: 14px 4%; gap: 10px; }
+  .setup-grid { grid-template-columns: 1fr; }
+  .controls-bar { flex-direction: column; align-items: stretch; }
+  .controls-bar .meta { margin-right: 0; }
+  .table-wrap { overflow-x: auto; }
+  .table-wrap table { min-width: 900px; }
+  .form-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <img class="topbar-logo" src="/images/futminna_matlab_space_logo.jpeg" alt="FUTMinna MATLAB Space logo">
+    <h1>FUTMinna <span>MATLAB</span> Space &mdash; Certificates</h1>
+  </div>
+  <nav>
+    <a href="/admin" class="site-link">Registrations</a>
+    <a href="/admin/attendance" class="site-link">Attendance</a>
+    <a href="/admin/certificates" class="active-link">Certificates</a>
+    {% if admin_role == 'super_admin' %}
+    <a href="/admin/manage-admins">Manage Admins</a>
+    {% endif %}
+    <a href="/admin/change-password">Change Password</a>
+    <a href="/" class="site-link">View Site</a>
+    <a href="/admin/logout" class="logout-btn">Sign Out</a>
+  </nav>
+</div>
+
+<div class="container">
+  <div class="stats">
+    <div class="stat-card">
+      <div class="number">{{ eligible_count }}</div>
+      <div class="label">Eligible (&ge; {{ settings.cert_min_days }} days)</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">{{ generated_count }}</div>
+      <div class="label">Certificates Generated</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">{{ sent_count }}</div>
+      <div class="label">Emails Sent</div>
+    </div>
+  </div>
+
+  {% if not smtp_ok %}
+  <div class="warn error">
+    <strong>SMTP not configured.</strong> Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD (plus MAIL_FROM, MAIL_FROM_NAME) in your environment variables to send certificates by email.
+  </div>
+  {% endif %}
+
+  <div class="setup-grid">
+    <div class="panel">
+      <h2><span class="num">1</span> Certificate Template</h2>
+      {% if has_template %}
+      <div class="warn success">Template uploaded. You can replace it below any time.</div>
+      {% else %}
+      <div class="warn info">No template uploaded yet &mdash; upload it here once your designer is done.</div>
+      {% endif %}
+
+      <form id="templateForm" enctype="multipart/form-data">
+        <div class="file-upload">
+          <input type="file" name="file" accept=".png,.jpg,.jpeg" onchange="handleTemplateFile(this)">
+          <div class="file-upload-text"><strong>Click to upload</strong> or drag and drop<br><small>PNG or JPG, up to 15 MB</small></div>
+          <div class="file-upload-name" id="templateFileName"></div>
+        </div>
+        <button type="submit" class="btn btn-teal" id="templateBtn" style="width:100%;justify-content:center;">Upload Template</button>
+      </form>
+
+      <h2 style="margin-top:28px;"><span class="num">2</span> Preview &amp; Position Name</h2>
+      <div class="form-row" style="grid-template-columns:repeat(2,1fr);">
+        <div class="form-group">
+          <label>Sample name</label>
+          <input type="text" id="sampleName" value="John Doe">
+        </div>
+        <div class="form-group">
+          <label>Minimum days to qualify</label>
+          <input type="number" id="certMinDays" min="1" max="8" value="{{ settings.cert_min_days }}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>X position (% from left)</label>
+          <input type="number" id="nameX" step="0.5" value="{{ settings.cert_name_x }}">
+        </div>
+        <div class="form-group">
+          <label>Y position (% from top)</label>
+          <input type="number" id="nameY" step="0.5" value="{{ settings.cert_name_y }}">
+        </div>
+        <div class="form-group">
+          <label>Name size (% of width)</label>
+          <input type="number" id="nameSize" step="0.1" value="{{ settings.cert_name_size }}">
+        </div>
+      </div>
+      <div class="form-row" style="grid-template-columns:repeat(3,1fr);">
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" id="nameColor" value="#{{ settings.cert_name_color }}">
+        </div>
+        <div class="form-group">
+          <label>Font</label>
+          <select id="nameFont">
+            <option value="georgia" {% if settings.cert_font == 'georgia' %}selected{% endif %}>Georgia (Classic)</option>
+            <option value="georgia_bold" {% if settings.cert_font == 'georgia_bold' %}selected{% endif %}>Georgia (Bold)</option>
+            <option value="times" {% if settings.cert_font == 'times' %}selected{% endif %}>Times New Roman</option>
+            <option value="arial" {% if settings.cert_font == 'arial' %}selected{% endif %}>Arial</option>
+            <option value="arial_bold" {% if settings.cert_font == 'arial_bold' %}selected{% endif %}>Arial (Bold)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Certificate number</label>
+          <input type="text" id="certPrefix" value="{{ settings.cert_number_prefix }}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Event name (used on emails)</label>
+        <input type="text" id="certEventName" value="{{ settings.cert_event_name }}">
+      </div>
+      <div class="form-group">
+        <label>Theme line (used on emails)</label>
+        <input type="text" id="certTheme" value="{{ settings.cert_theme }}">
+      </div>
+      <div class="form-group">
+        <label>Certificate body text (used on emails)</label>
+        <input type="text" id="certBody" value="{{ settings.cert_body }}">
+      </div>
+      <button class="btn btn-blue" onclick="saveSettings(event)" style="width:100%;justify-content:center;">Save Settings</button>
+    </div>
+
+    <div class="panel">
+      <h2><span class="num">3</span> Live Preview</h2>
+      <div class="preview-box">
+        {% if has_template %}
+        <img id="previewImg" alt="Certificate preview">
+        {% else %}
+        <div class="preview-missing">Upload a template in step 1 to see a live preview here.</div>
+        {% endif %}
+      </div>
+      <div class="warn info">
+        Tip: adjust X, Y and size until the sample name sits perfectly, then hit <strong>Save Settings</strong>. Drag feels rough on purpose &mdash; use the number fields for pixel-perfect control.
+      </div>
+    </div>
+  </div>
+
+  <div class="controls-bar">
+    <span class="meta">{{ participants|length }} registered &middot; {{ eligible_count }} eligible &middot; {{ generated_count }} generated</span>
+    {% if has_template %}
+    <button class="btn btn-green" id="generateAllBtn" onclick="generateAll()">Generate All Eligible</button>
+    {% endif %}
+    <button class="btn btn-teal" id="sendAllBtn" onclick="sendAll()" {% if not smtp_ok or generated_count == 0 %}disabled{% endif %}>Send Unsent Certificates</button>
+    <a class="btn btn-blue" href="/admin/certificates/export">Export Eligibility CSV</a>
+    <a class="btn btn-ghost" href="/admin/certificates/preview?name={{ 'John Doe' }}" target="_blank">Open Preview</a>
+  </div>
+
+  {% if participants %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Participant</th>
+          <th>Email</th>
+          <th>Days (D1&ndash;D8)</th>
+          <th>Status</th>
+          <th>Certificate No.</th>
+          <th>Generated</th>
+          <th>Sent</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in participants %}
+        <tr id="row-{{ p.registration_id }}">
+          <td class="name-cell">{{ p.fullname }}</td>
+          <td class="email-cell">
+            {% if p.email and 'placeholder.local' not in p.email %}
+            {{ p.email }}
+            {% else %}
+            <span style="color:var(--mw-text-muted);font-size:.8rem;">(no valid email)</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="day-dots">
+              {% for d in days %}
+              <span class="day-dot {% if d.number in p.days_list %}on{% endif %}">{{ d.number }}</span>
+              {% endfor %}
+            </div>
+            <span style="color:var(--mw-text-muted);font-size:.75rem;margin-top:4px;display:block;">{{ p.days_attended }} attended</span>
+          </td>
+          <td>
+            {% if p.eligible %}
+            <span class="badge ok">Eligible</span>
+            {% else %}
+            <span class="badge no">Not eligible</span>
+            {% endif %}
+          </td>
+          <td style="font-family:'Consolas',monospace;font-size:.82rem;color:var(--mw-text-secondary);">
+            {{ p.certificate_number or '&mdash;' | safe }}
+          </td>
+          <td>
+            {% if p.generated_at %}
+            <span class="badge ok">Yes</span>
+            {% else %}
+            <span class="badge no">No</span>
+            {% endif %}
+          </td>
+          <td id="sent-cell-{{ p.registration_id }}">
+            {% if p.sent_at %}
+            <span class="badge ok" title="{{ p.sent_at }}">Sent</span>
+            {% else %}
+            <span class="badge warn">Not sent</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="row-actions" id="actions-{{ p.registration_id }}">
+              {% if p.eligible %}
+                {% if p.generated_at %}
+                <a class="mini-btn primary" href="/admin/certificates/download/{{ p.registration_id }}">Download</a>
+                {% else %}
+                <button class="mini-btn primary" onclick="generateOne({{ p.registration_id }})">Generate</button>
+                {% endif %}
+                {% if p.sent_at %}
+                <button class="mini-btn green" disabled>Sent</button>
+                {% elif p.generated_at and p.email and 'placeholder.local' not in p.email %}
+                <button class="mini-btn green" onclick="sendOne({{ p.registration_id }})">Send Email</button>
+                {% endif %}
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No participants yet</h3>
+    <p>Register participants and mark their attendance first, then generate certificates here.</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let isBusy = false;
+
+function handleTemplateFile(input) {
+  document.getElementById('templateFileName').textContent = input.files[0] ? input.files[0].name : '';
+}
+
+document.getElementById('templateForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('templateBtn');
+  btn.disabled = true; btn.textContent = 'Uploading...';
+  fetch('/admin/certificates/template', {method: 'POST', body: new FormData(this)})
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) showToast(d.error, 'error');
+      else { showToast(d.message, 'success'); location.reload(); }
+    })
+    .catch(() => showToast('Network error', 'error'))
+    .finally(() => { btn.disabled = false; btn.textContent = 'Upload Template'; });
+});
+
+function previewParams() {
+  const colorHex = document.getElementById('nameColor').value.replace('#', '');
+  return 'name=' + encodeURIComponent(document.getElementById('sampleName').value || 'John Doe') +
+    '&x=' + document.getElementById('nameX').value +
+    '&y=' + document.getElementById('nameY').value +
+    '&size=' + document.getElementById('nameSize').value +
+    '&color=' + colorHex +
+    '&font=' + document.getElementById('nameFont').value;
+}
+
+function updatePreview() {
+  const img = document.getElementById('previewImg');
+  if (!img) return;
+  img.src = '/admin/certificates/preview?' + previewParams() + '&t=' + Date.now();
+}
+
+['sampleName','nameX','nameY','nameSize','nameFont'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePreview);
+});
+document.getElementById('nameColor').addEventListener('input', updatePreview);
+window.addEventListener('load', updatePreview);
+
+function saveSettings(e) {
+  if (e) e.preventDefault();
+  if (isBusy) return;
+  isBusy = true;
+  const payload = {
+    cert_min_days: document.getElementById('certMinDays').value,
+    cert_name_x: document.getElementById('nameX').value,
+    cert_name_y: document.getElementById('nameY').value,
+    cert_name_size: document.getElementById('nameSize').value,
+    cert_name_color: document.getElementById('nameColor').value.replace('#', ''),
+    cert_font: document.getElementById('nameFont').value,
+    cert_event_name: document.getElementById('certEventName').value,
+    cert_theme: document.getElementById('certTheme').value,
+    cert_number_prefix: document.getElementById('certPrefix').value,
+    cert_body: document.getElementById('certBody').value,
+  };
+  fetch('/admin/certificates/settings', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) showToast(d.error, 'error');
+    else { showToast(d.message, 'success'); setTimeout(() => location.reload(), 800); }
+  })
+  .catch(() => showToast('Network error', 'error'))
+  .finally(() => { isBusy = false; });
+}
+
+function setRowBusy(rowId, busy) {
+  const btn = document.querySelector('#actions-' + rowId + ' .mini-btn:not([disabled])');
+  if (btn) btn.disabled = busy;
+}
+
+function generateAll() {
+  if (isBusy) return;
+  isBusy = true;
+  const btn = document.getElementById('generateAllBtn');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  fetch('/admin/certificates/generate')
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) showToast(d.error, 'error');
+      else { showToast(d.message, 'success'); setTimeout(() => location.reload(), 1000); }
+    })
+    .catch(() => showToast('Network error', 'error'))
+    .finally(() => { isBusy = false; btn.disabled = false; btn.textContent = 'Generate All Eligible'; });
+}
+
+function generateOne(id) {
+  fetch('/admin/certificates/generate/' + id, {method: 'POST'})
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) showToast(d.error, 'error');
+      else { showToast(d.message, 'success'); setTimeout(() => location.reload(), 800); }
+    })
+    .catch(() => showToast('Network error', 'error'));
+}
+
+function sendOne(id) {
+  const btn = document.querySelector('#actions-' + id + ' .mini-btn.green');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+  fetch('/admin/certificates/send/' + id, {method: 'POST'})
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { showToast(d.error, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Send Email'; } }
+      else {
+        showToast(d.message, 'success');
+        const cell = document.getElementById('sent-cell-' + id);
+        if (cell) cell.innerHTML = '<span class="badge ok">Sent</span>';
+        if (btn) { btn.disabled = true; btn.textContent = 'Sent'; }
+      }
+    })
+    .catch(() => { showToast('Network error', 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Send Email'; } });
+}
+
+function sendAll() {
+  if (isBusy) return;
+  isBusy = true;
+  fetch('/admin/certificates/eligible')
+    .then(r => r.json())
+    .then(async list => {
+      const targets = list.filter(p =>
+        p.eligible && p.generated_at && !p.sent_at && !p.skippable
+      );
+      if (targets.length === 0) {
+        showToast('Nothing to send.', 'success');
+        isBusy = false;
+        return;
+      }
+      showToast('Sending to ' + targets.length + ' participants...', 'success');
+      for (let i = 0; i < targets.length; i++) {
+        const p = targets[i];
+        await fetch('/admin/certificates/send/' + p.registration_id, {method: 'POST'})
+          .then(r => r.json())
+          .then(d => {
+            if (!d.error) {
+              const cell = document.getElementById('sent-cell-' + p.registration_id);
+              if (cell) cell.innerHTML = '<span class="badge ok">Sent</span>';
+            }
+          })
+          .catch(() => {});
+        showToast('Progress: ' + (i + 1) + '/' + targets.length, 'success');
+      }
+      showToast('All unsent certificates processed.', 'success');
+      setTimeout(() => location.reload(), 800);
+      isBusy = false;
+    })
+    .catch(() => { showToast('Failed to load list', 'error'); isBusy = false; });
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+
+</body>
+</html>

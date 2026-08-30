@@ -10,6 +10,8 @@ FUTMinna MATLAB Space is a one-week, hands-on MATLAB training program at Federal
 
 - **Registration form** — collects name, email, phone, level, department, and expectation
 - **Admin dashboard** — lets admins search, filter, paginate, and export registrations
+- **Daily attendance** — mark present/absent per day (Day 1–8), Excel import/export
+- **Certificates** — auto-generate personalized certificate PDFs from attendance, with a configurable "minimum days" eligibility rule, live name positioning preview, single/bulk generation, and email delivery via SMTP
 - **Duplicate protection** — one registration per email address
 - **Rate limiting** — `/api/register` allows 5 submissions per minute per IP
 - **Success modal** — confirms registration and offers Google Calendar and `.ics` download links
@@ -60,6 +62,24 @@ Open `http://localhost:5000`.
 | `DATABASE_URL` | **Yes** | Postgres pooled connection string |
 | `ADMIN_PASSWORD` | **Yes** | Admin dashboard password |
 | `SECRET_KEY` | No | Flask session secret. Falls back to a random value per restart if unset |
+| `SMTP_HOST` | For sending certs | SMTP server for certificate emails (e.g. `smtp.gmail.com`) |
+| `SMTP_PORT` | No | SMTP port, defaults to `587` |
+| `SMTP_USER` | For sending certs | SMTP username |
+| `SMTP_PASSWORD` | For sending certs | SMTP password / app password |
+| `MAIL_FROM` | No | "From" address. Defaults to `SMTP_USER` |
+| `MAIL_FROM_NAME` | No | Display name in the From line. Defaults to the event name |
+
+## Certificates
+
+Open **Admin → Certificates** in the dashboard.
+
+1. **Upload the certificate template** (PNG/JPG) once your designer finishes it.
+2. **Position the name** with the live preview — set X, Y, font size (as % of image width), color, and font, then **Save Settings**.
+3. **Set the minimum days** to qualify (default 4). Participants with attendance `>=` this number are marked *Eligible*.
+4. **Generate All Eligible** creates one personalized PDF per eligible participant. Long names auto-shrink or wrap to two lines.
+5. **Download** single certificates, or **Send Unsent Certificates** to email each one (participants with placeholder emails, e.g. `@placeholder.local`, are skipped).
+
+Eligibility can be exported as CSV any time. Certificate PDFs and the template are stored in Postgres so they survive Vercel cold starts.
 
 ## Deploying to Vercel
 
@@ -75,6 +95,8 @@ Then redeploy. Registrations persist in your database across cold starts.
 
 ```
 ├── app.py                  # Flask backend
+├── certificates.py         # Certificate rendering, eligibility + SMTP email helper
+├── fonts/                  # Bundled TTF fonts used for certificate name text
 ├── requirements.txt        # Python dependencies
 ├── vercel.json             # Vercel deployment config
 ├── index.html              # Landing page + registration form
@@ -82,7 +104,9 @@ Then redeploy. Registrations persist in your database across cold starts.
 ├── script.js               # Particles, scroll reveals, form logic
 └── templates/
     ├── admin_login.html    # Admin login page
-    └── admin_dashboard.html # Admin dashboard with search/filter/export/pagination
+    ├── admin_dashboard.html # Admin dashboard with search/filter/export/pagination
+    ├── admin_attendance.html # Daily attendance marking + Excel import/export
+    └── admin_certificates.html # Certificate template upload, positioning, generation & emailing
 ```
 
 ## License

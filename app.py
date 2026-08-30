@@ -1,6 +1,7 @@
 import os
 import csv
 import io
+import re
 import secrets
 from functools import wraps
 from datetime import date, datetime
@@ -15,6 +16,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from openpyxl import load_workbook
 from werkzeug.security import generate_password_hash, check_password_hash
+
+import certificates as certs
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -105,6 +108,32 @@ def ensure_db():
                     "INSERT INTO admins (username, password_hash, role) VALUES (%s, %s, %s)",
                     ("admin", generate_password_hash(ADMIN_PASSWORD), "super_admin")
                 )
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS certificates (
+                    id SERIAL PRIMARY KEY,
+                    registration_id INTEGER NOT NULL UNIQUE REFERENCES registrations(id) ON DELETE CASCADE,
+                    days_attended INTEGER NOT NULL DEFAULT 0,
+                    eligible BOOLEAN NOT NULL DEFAULT FALSE,
+                    certificate_number TEXT UNIQUE,
+                    certificate_pdf BYTEA,
+                    generated_at TIMESTAMP,
+                    sent_at TIMESTAMP,
+                    created_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'Africa/Lagos')
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS cert_template (
+                    id INTEGER PRIMARY KEY,
+                    image BYTEA NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'Africa/Lagos')
+                )
+            """)
         conn.commit()
     return True
 
@@ -830,6 +859,293 @@ def admin_search_users():
         results = []
 
     return jsonify(results)
+
+
+@app.route("/admin/certificates")
+@admin_required
+def admin_certificates():
+    with get_db() as conn:
+        settings = certs.get_settings(conn)
+        template = certs.get_template(conn) is not None
+        participants = certs.eligible_participants(conn, int(settings["cert_min_days"]))
+
+        sent_by_reg = {}
+        with conn.cursor() as cur:
+            cur.execute("SELECT registration_id, sent_at, generated_at, certificate_number FROM certificates")
+            for reg_id, sent_at, generated_at, num in cur.fetchall():
+                sent_by_reg[reg_id] = {"sent_at": sent_at, "generated_at": generated_at, "number": num}
+
+    for p in participants:
+        info = sent_by_reg.get(p["registration_id"])
+        p["sent_at"] = info["sent_at"] if info else None
+        p["generated_at"] = info["generated_at"] if info else None
+        p["certificate_number"] = info["number"] if info else None
+
+    eligible_count = sum(1 for p in participants if p["eligible"])
+    generated_count = sum(1 for p in participants if p["generated_at"])
+    sent_count = sum(1 for p in participants if p["sent_at"])
+
+    return render_template("admin_certificates.html",
+        settings=settings, has_template=template,
+        participants=participants, days=BOOTCAMP_DAYS,
+        eligible_count=eligible_count, generated_count=generated_count, sent_count=sent_count,
+        smtp_ok=certs.smtp_configured())
+
+
+@app.route("/admin/certificates/settings", methods=["POST"])
+@admin_required
+def certificates_settings():
+    data = request.get_json(force=True)
+    allowed = {
+        "cert_min_days", "cert_name_x", "cert_name_y", "cert_name_size",
+        "cert_name_color", "cert_font", "cert_event_name", "cert_theme",
+        "cert_number_prefix", "cert_body"
+    }
+    with get_db() as conn:
+        settings = certs.get_settings(conn)
+        for k, v in data.items():
+            if k in allowed and v is not None:
+                settings[k] = str(v)
+        try:
+            creds = [not settings[k].strip() for k in ("cert_min_days", "cert_name_x", "cert_name_y", "cert_name_size", "cert_name_color")]
+            if any(creds):
+                return jsonify({"error": "Position, size, color and minimum days cannot be empty."}), 400
+            if not (1 <= int(settings["cert_min_days"]) <= 8):
+                return jsonify({"error": "Minimum days must be between 1 and 8."}), 400
+        except ValueError:
+            return jsonify({"error": "Numeric fields must be numbers."}), 400
+        certs.save_settings(conn, settings)
+    return jsonify({"message": "Certificate settings saved."}), 200
+
+
+@app.route("/admin/certificates/template", methods=["POST"])
+@admin_required
+def certificates_upload_template():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    file = request.files["file"]
+    if not file.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+        return jsonify({"error": "Only PNG or JPG images are supported"}), 400
+    data = file.read()
+    if not data:
+        return jsonify({"error": "Empty file"}), 400
+    if len(data) > 15 * 1024 * 1024:
+        return jsonify({"error": "Image too large (max 15 MB)"}), 400
+    try:
+        with get_db() as conn:
+            certs.save_template(conn, data)
+    except Exception:
+        return jsonify({"error": "Failed to save template"}), 500
+    return jsonify({"message": "Certificate template uploaded successfully."}), 200
+
+
+@app.route("/admin/certificates/generate")
+@admin_required
+def certificates_generate_all():
+    with get_db() as conn:
+        settings = certs.get_settings(conn)
+        template = certs.get_template(conn)
+        if not template:
+            return jsonify({"error": "No certificate template uploaded yet."}), 400
+
+        participants = certs.eligible_participants(conn, int(settings["cert_min_days"]))
+        eligible = [p for p in participants if p["eligible"]]
+
+        with conn.cursor() as cur:
+            cur.execute("SELECT registration_id, certificate_pdf FROM certificates")
+            existing = {r[0]: r[1] for r in cur.fetchall()}
+
+        generated = 0
+        for p in eligible:
+            reg_id = p["registration_id"]
+            if existing.get(reg_id):
+                generated += 1
+                continue
+            pdf = certs.render_certificate_pdf(template, p["fullname"], settings)
+            number = certs.assign_next_certificate_number(conn, settings["cert_number_prefix"])
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO certificates (registration_id, days_attended, eligible, certificate_number, certificate_pdf, generated_at) "
+                    "VALUES (%s, %s, %s, %s, %s, NOW() AT TIME ZONE 'Africa/Lagos') "
+                    "ON CONFLICT (registration_id) DO UPDATE SET certificate_pdf = EXCLUDED.certificate_pdf, "
+                    "certificate_number = COALESCE(certificates.certificate_number, EXCLUDED.certificate_number), "
+                    "generated_at = NOW() AT TIME ZONE 'Africa/Lagos'",
+                    (reg_id, p["days_attended"], True, number, psycopg2.Binary(pdf))
+                )
+            conn.commit()
+            generated += 1
+
+        not_eligible = sum(1 for p in participants if not p["eligible"])
+    return jsonify({
+        "message": f"Generated {generated} certificate{'s' if generated != 1 else ''}. {not_eligible} not eligible.",
+        "generated": generated,
+        "not_eligible": not_eligible
+    }), 200
+
+
+@app.route("/admin/certificates/generate/<int:reg_id>", methods=["POST"])
+@admin_required
+def certificates_generate_one(reg_id):
+    with get_db() as conn:
+        settings = certs.get_settings(conn)
+        template = certs.get_template(conn)
+        if not template:
+            return jsonify({"error": "No certificate template uploaded yet."}), 400
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT fullname FROM registrations WHERE id = %s",
+                (reg_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Participant not found."}), 404
+            fullname = certs.normalize_name(row[0])
+            cur.execute(
+                "SELECT COUNT(*) FROM attendance WHERE registration_id = %s",
+                (reg_id,)
+            )
+            days = cur.fetchone()[0]
+
+        pdf = certs.render_certificate_pdf(template, fullname, settings)
+        number = certs.assign_next_certificate_number(conn, settings["cert_number_prefix"])
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO certificates (registration_id, days_attended, eligible, certificate_number, certificate_pdf, generated_at) "
+                "VALUES (%s, %s, %s, %s, %s, NOW() AT TIME ZONE 'Africa/Lagos') "
+                "ON CONFLICT (registration_id) DO UPDATE SET certificate_pdf = EXCLUDED.certificate_pdf, "
+                "certificate_number = COALESCE(certificates.certificate_number, EXCLUDED.certificate_number), "
+                "generated_at = NOW() AT TIME ZONE 'Africa/Lagos'",
+                (reg_id, days, days >= int(settings["cert_min_days"]), number, psycopg2.Binary(pdf))
+            )
+        conn.commit()
+    return jsonify({"message": "Certificate generated.", "certificate_number": number}), 200
+
+
+@app.route("/admin/certificates/send/<int:reg_id>", methods=["POST"])
+@admin_required
+def certificates_send_one(reg_id):
+    if not certs.smtp_configured():
+        return jsonify({"error": "SMTP is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASSWORD."}), 400
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT c.certificate_pdf, c.certificate_number, r.fullname, r.email "
+                "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
+                "WHERE c.registration_id = %s",
+                (reg_id,)
+            )
+            row = cur.fetchone()
+            if not row or not row[0]:
+                return jsonify({"error": "No generated certificate for this participant yet."}), 400
+            pdf, number, fullname, email = row
+
+        if certs.is_placeholder_email(email):
+            return jsonify({"error": "Participant has no valid email address to send to."}), 400
+
+        settings = certs.get_settings(conn)
+        try:
+            certs.send_certificate_email(email, certs.normalize_name(fullname), number, bytes(pdf), settings)
+        except Exception as e:
+            return jsonify({"error": f"Email failed: {str(e)[:160]}"}), 500
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE certificates SET sent_at = NOW() AT TIME ZONE 'Africa/Lagos' WHERE registration_id = %s",
+                (reg_id,)
+            )
+        conn.commit()
+    return jsonify({"message": f"Certificate sent to {email}."}), 200
+
+
+@app.route("/admin/certificates/download/<int:reg_id>")
+@admin_required
+def certificates_download(reg_id):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT c.certificate_pdf, r.fullname "
+                "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
+                "WHERE c.registration_id = %s",
+                (reg_id,)
+            )
+            row = cur.fetchone()
+            if not row or not row[0]:
+                return "Certificate not generated yet", 404
+            pdf, fullname = row
+
+    safe_name = re.sub(r"[^A-Za-z0-9 _-]", "", fullname).replace(" ", "_")
+    return app.response_class(
+        bytes(pdf),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=FUTMinna_MATLAB_Certificate_{safe_name}.pdf"}
+    )
+
+
+@app.route("/admin/certificates/preview")
+@admin_required
+def certificates_preview():
+    with get_db() as conn:
+        template = certs.get_template(conn)
+        if not template:
+            return "No template uploaded yet", 404
+        settings = certs.get_settings(conn)
+        sample = request.args.get("name", "John Doe")
+        settings["cert_name_x"] = request.args.get("x", settings.get("cert_name_x"))
+        settings["cert_name_y"] = request.args.get("y", settings.get("cert_name_y"))
+        settings["cert_name_size"] = request.args.get("size", settings.get("cert_name_size"))
+        settings["cert_name_color"] = request.args.get("color", settings.get("cert_name_color"))
+        settings["cert_font"] = request.args.get("font", settings.get("cert_font"))
+        png = certs.render_certificate_png(template, certs.normalize_name(sample), settings)
+    return app.response_class(png, mimetype="image/png")
+
+
+@app.route("/admin/certificates/export")
+@admin_required
+def certificates_export():
+    with get_db() as conn:
+        settings = certs.get_settings(conn)
+        participants = certs.eligible_participants(conn, int(settings["cert_min_days"]))
+        with conn.cursor() as cur:
+            cur.execute("SELECT registration_id, certificate_number, sent_at, generated_at FROM certificates")
+            info = {r[0]: r for r in cur.fetchall()}
+
+    output = io.StringIO()
+    output.write("\ufeff")
+    writer = csv.writer(output)
+    writer.writerow(["Full Name", "Email", "Days Attended", "Eligible", "Certificate Number", "Generated", "Sent"])
+    for p in participants:
+        i = info.get(p["registration_id"])
+        writer.writerow([
+            p["fullname"], p["email"], p["days_attended"], "Yes" if p["eligible"] else "No",
+            i[1] if i else "", "Yes" if i and i[3] else "No", "Yes" if i and i[2] else "No"
+        ])
+
+    return app.response_class(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=certificates_eligibility.csv"}
+    )
+
+
+@app.route("/admin/certificates/eligible")
+@admin_required
+def certificates_eligible_json():
+    with get_db() as conn:
+        settings = certs.get_settings(conn)
+        participants = certs.eligible_participants(conn, int(settings["cert_min_days"]))
+        with conn.cursor() as cur:
+            cur.execute("SELECT registration_id, sent_at, generated_at, certificate_number FROM certificates")
+            info = {r[0]: r for r in cur.fetchall()}
+        for p in participants:
+            i = info.get(p["registration_id"])
+            p["generated_at"] = i[2].isoformat() if i and i[2] else None
+            p["sent_at"] = i[1].isoformat() if i and i[1] else None
+            p["certificate_number"] = i[3] if i else None
+            p["skippable"] = certs.is_placeholder_email(p["email"])
+    return jsonify(participants)
 
 
 if __name__ == "__main__":
