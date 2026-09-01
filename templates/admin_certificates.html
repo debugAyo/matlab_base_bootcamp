@@ -673,7 +673,7 @@ function saveSettings(e) {
   .then(r => r.json())
   .then(d => {
     if (d.error) showToast(d.error, 'error');
-    else { showToast(d.message, 'success'); setTimeout(() => location.reload(), 800); }
+    else { showToast(d.message + ' Downloads will use new position immediately.', 'success'); setTimeout(() => location.reload(), 800); }
   })
   .catch(() => showToast('Network error', 'error'))
   .finally(() => { isBusy = false; });

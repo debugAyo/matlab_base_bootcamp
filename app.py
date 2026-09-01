@@ -1078,21 +1078,27 @@ def certificates_send_one(reg_id):
 @admin_required
 def certificates_download(reg_id):
     with get_db() as conn:
+        template = certs.get_template(conn)
+        settings = certs.get_settings(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT c.certificate_pdf, r.fullname "
+                "SELECT c.certificate_number, r.fullname "
                 "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
                 "WHERE c.registration_id = %s",
                 (reg_id,)
             )
             row = cur.fetchone()
-            if not row or not row[0]:
+            if not row:
                 return "Certificate not generated yet", 404
-            pdf, fullname = row
+            cert_number, fullname = row
 
+    if not template:
+        return "No template uploaded yet", 404
+
+    pdf = certs.render_certificate_pdf(template, certs.normalize_name(fullname), settings)
     safe_name = re.sub(r"[^A-Za-z0-9 _-]", "", fullname).replace(" ", "_")
     return app.response_class(
-        bytes(pdf),
+        pdf,
         mimetype="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={safe_name}_certificate.pdf"}
     )
@@ -1111,22 +1117,26 @@ def certificates_download_bulk():
     except (TypeError, ValueError):
         return jsonify({"error": "Invalid certificate IDs."}), 400
 
-    buf = io.BytesIO()
-    found = 0
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        with get_db() as conn:
+    with get_db() as conn:
+        template = certs.get_template(conn)
+        settings = certs.get_settings(conn)
+        if not template:
+            return jsonify({"error": "No certificate template uploaded yet."}), 400
+
+        buf = io.BytesIO()
+        found = 0
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT c.certificate_pdf, r.fullname "
+                    "SELECT r.fullname "
                     "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
                     "WHERE c.registration_id = ANY(%s)",
                     (ids,)
                 )
-                for pdf_bytes, fullname in cur.fetchall():
-                    if not pdf_bytes:
-                        continue
+                for (fullname,) in cur.fetchall():
+                    pdf = certs.render_certificate_pdf(template, certs.normalize_name(fullname), settings)
                     safe_name = re.sub(r"[^A-Za-z0-9 _-]", "", fullname).replace(" ", "_")
-                    zf.writestr(f"{safe_name}_certificate.pdf", bytes(pdf_bytes))
+                    zf.writestr(f"{safe_name}_certificate.pdf", pdf)
                     found += 1
 
     if found == 0:
@@ -1342,7 +1352,7 @@ def certificates_gallery():
         settings = certs.get_settings(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT c.registration_id, r.fullname, c.certificate_number, c.generated_at, c.sent_at "
+                "SELECT c.registration_id, r.fullname, r.email, c.certificate_number, c.generated_at, c.sent_at "
                 "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
                 "ORDER BY r.fullname ASC"
             )
@@ -1351,9 +1361,10 @@ def certificates_gallery():
         {
             "registration_id": r[0],
             "fullname": r[1],
-            "certificate_number": r[2],
-            "generated_at": str(r[3]) if r[3] else None,
-            "sent_at": str(r[4]) if r[4] else None,
+            "email": r[2],
+            "certificate_number": r[3],
+            "generated_at": str(r[4]) if r[4] else None,
+            "sent_at": str(r[5]) if r[5] else None,
         }
         for r in rows
     ]
