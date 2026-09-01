@@ -983,13 +983,13 @@ let reviewItems = [];
 let reviewIdx = 0;
 
 function openReviewMode() {
-  fetch('/admin/certificates/gallery')
+  fetch('/admin/certificates/eligible')
     .then(r => r.json())
     .then(items => {
       reviewItems = items;
       reviewIdx = 0;
       if (reviewItems.length === 0) {
-        showToast('No generated certificates to review.', 'error');
+        showToast('No eligible participants to review.', 'error');
         return;
       }
       document.getElementById('reviewOverlay').classList.add('active');
@@ -1006,11 +1006,13 @@ function renderReview() {
   document.getElementById('reviewImg').src = '/admin/certificates/preview/' + item.registration_id + '?t=' + Date.now();
   document.getElementById('reviewName').textContent = item.fullname;
   document.getElementById('reviewEmail').textContent = item.email || '';
-  document.getElementById('reviewNumber').textContent = item.certificate_number || '';
+  document.getElementById('reviewNumber').textContent = item.certificate_number || '(not yet generated)';
   document.getElementById('reviewCounter').textContent = (reviewIdx + 1) + ' / ' + reviewItems.length;
   document.getElementById('reviewDownload').href = '/admin/certificates/download/' + item.registration_id;
   document.getElementById('reviewPrev').disabled = reviewIdx === 0;
   document.getElementById('reviewNext').disabled = reviewIdx === reviewItems.length - 1;
+  const sendBtn = document.getElementById('reviewSendBtn');
+  if (sendBtn) sendBtn.disabled = !item.generated_at;
 }
 function reviewPrev() { if (reviewIdx > 0) { reviewIdx--; renderReview(); } }
 function reviewNext() { if (reviewIdx < reviewItems.length - 1) { reviewIdx++; renderReview(); } }

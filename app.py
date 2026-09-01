@@ -1100,7 +1100,11 @@ def certificates_download(reg_id):
     return app.response_class(
         pdf,
         mimetype="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={safe_name}_certificate.pdf"}
+        headers={
+            "Content-Disposition": f"attachment; filename={safe_name}_certificate.pdf",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        }
     )
 
 
