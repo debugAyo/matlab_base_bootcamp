@@ -296,6 +296,12 @@
         return;
       }
 
+      if (data.fullname.split(/\s+/).filter(Boolean).length < 2) {
+        showMessage("Please enter your full name (first and last name).", "error");
+        submitBtn.classList.remove("loading");
+        return;
+      }
+
       try {
         const res = await fetch(API_URL, {
           method: "POST",

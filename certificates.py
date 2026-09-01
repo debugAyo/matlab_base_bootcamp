@@ -91,6 +91,77 @@ def normalize_name(name):
     return " ".join(tokens)
 
 
+def has_full_name(name):
+    if not name:
+        return False
+    words = [w for w in re.sub(r"[-']", " ", name.strip()).split() if w]
+    return len(words) >= 2
+
+
+SMTP_SETTING_DEFAULTS = {
+    "smtp_host": "",
+    "smtp_port": "587",
+    "smtp_user": "",
+    "smtp_password": "",
+    "smtp_from": "",
+    "smtp_from_name": "FUTMinna MATLAB Space",
+}
+
+SMTP_SETTING_KEYS = list(SMTP_SETTING_DEFAULTS.keys())
+
+
+def get_smtp_settings(conn):
+    settings = dict(SMTP_SETTING_DEFAULTS)
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT key, value FROM smtp_settings"
+                )
+                for key, value in cur.fetchall():
+                    if key in settings:
+                        settings[key] = value or ""
+        except Exception:
+            pass
+    return settings
+
+
+def save_smtp_settings(conn, values):
+    with conn.cursor() as cur:
+        for key, value in values.items():
+            if key in SMTP_SETTING_DEFAULTS:
+                cur.execute(
+                    "INSERT INTO smtp_settings (key, value) VALUES (%s, %s) "
+                    "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                    (key, str(value)),
+                )
+    conn.commit()
+
+
+def resolve_smtp_config(conn):
+    db = get_smtp_settings(conn) if conn is not None else dict(SMTP_SETTING_DEFAULTS)
+    config = {
+        "host": os.environ.get("SMTP_HOST", "").strip() or db.get("smtp_host", "").strip(),
+        "port": int(os.environ.get("SMTP_PORT", db.get("smtp_port", "587") or "587")),
+        "user": os.environ.get("SMTP_USER", "").strip() or db.get("smtp_user", "").strip(),
+        "password": os.environ.get("SMTP_PASSWORD", "").strip() or db.get("smtp_password", "").strip(),
+        "from": os.environ.get("MAIL_FROM", "").strip() or db.get("smtp_from", "").strip(),
+        "from_name": os.environ.get("MAIL_FROM_NAME", "").strip()
+                    or db.get("smtp_from_name", "FUTMinna MATLAB Space").strip()
+                    or "FUTMinna MATLAB Space",
+    }
+    if not config["from"]:
+        config["from"] = config["user"]
+    return config
+
+
+def smtp_configured():
+    host = os.environ.get("SMTP_HOST", "").strip()
+    user = os.environ.get("SMTP_USER", "").strip()
+    password = os.environ.get("SMTP_PASSWORD", "").strip()
+    return bool(host and user and password)
+
+
 def load_font(font_key, size):
     if font_key not in FONTS:
         font_key = "georgia"
@@ -211,13 +282,22 @@ def smtp_configured():
     )
 
 
-def send_certificate_email(to_email, fullname, cert_number, pdf_bytes, settings):
-    host = os.environ.get("SMTP_HOST")
-    port = int(os.environ.get("SMTP_PORT", "587"))
-    user = os.environ.get("SMTP_USER")
-    password = os.environ.get("SMTP_PASSWORD")
-    from_addr = os.environ.get("MAIL_FROM", user)
-    from_name = os.environ.get("MAIL_FROM_NAME", settings.get("cert_event_name", "FUTMinna MATLAB Space"))
+def send_certificate_email(to_email, fullname, cert_number, pdf_bytes, settings, config=None):
+    if config is None:
+        config = {
+            "host": os.environ.get("SMTP_HOST"),
+            "port": int(os.environ.get("SMTP_PORT", "587")),
+            "user": os.environ.get("SMTP_USER"),
+            "password": os.environ.get("SMTP_PASSWORD"),
+            "from": os.environ.get("MAIL_FROM", os.environ.get("SMTP_USER")),
+            "from_name": os.environ.get("MAIL_FROM_NAME", settings.get("cert_event_name", "FUTMinna MATLAB Space")),
+        }
+    host = config.get("host")
+    port = int(config.get("port", 587))
+    user = config.get("user")
+    password = config.get("password")
+    from_addr = config.get("from") or user
+    from_name = config.get("from_name") or settings.get("cert_event_name", "FUTMinna MATLAB Space")
 
     event = settings.get("cert_event_name", "FUTMinna MATLAB Space")
     theme = settings.get("cert_theme", "")

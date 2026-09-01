@@ -69,6 +69,8 @@ Open `http://localhost:5000`.
 | `MAIL_FROM` | No | "From" address. Defaults to `SMTP_USER` |
 | `MAIL_FROM_NAME` | No | Display name in the From line. Defaults to the event name |
 
+> **Note:** SMTP can also be configured from the browser — open **Certificates → SMTP Settings** in the admin dashboard and use the **Test Connection** button. Settings saved there are stored in the database and take effect immediately. Environment variables take priority if both are set.
+
 ## Certificates
 
 Open **Admin → Certificates** in the dashboard.
@@ -78,6 +80,17 @@ Open **Admin → Certificates** in the dashboard.
 3. **Set the minimum days** to qualify (default 4). Participants with attendance `>=` this number are marked *Eligible*.
 4. **Generate All Eligible** creates one personalized PDF per eligible participant. Long names auto-shrink or wrap to two lines.
 5. **Download** single certificates, or **Send Unsent Certificates** to email each one (participants with placeholder emails, e.g. `@placeholder.local`, are skipped).
+
+### Preview & Gallery
+
+- **Preview** (per row): opens the actual rendered certificate (PNG) for any participant in a modal, so you can confirm the name/position before sending.
+- **Gallery**: a grid of every generated certificate thumbnail at the bottom of the Certificates page. Click any thumbnail to enlarge it. Uses your real participant names.
+
+### Fixing Names ("only one name shows")
+
+Certificates render exactly what is stored in the database. If a participant's name was saved with only one word (e.g. only "Caleb"), use the **Edit Name** button on their row (in either the Dashboard or Certificates page) to enter the correct full name (e.g. "Caleb Emmanuel"). The database is updated and the certificate is **regenerated automatically** if one already exists.
+
+To prevent this going forward, the public registration form **requires a full name** (first + last name), validated on both the frontend and backend (`/api/register`). Imported names are normalized/capitalized on save.
 
 Eligibility can be exported as CSV any time. Certificate PDFs and the template are stored in Postgres so they survive Vercel cold starts.
 

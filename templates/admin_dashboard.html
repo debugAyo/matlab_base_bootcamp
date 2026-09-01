@@ -195,6 +195,13 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
 .btn-submit:hover { background: #B72408; transform: translateY(-1px); }
 .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
+.mini-btn {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--mw-border); font-size: .82rem;
+  font-weight: 600; cursor: pointer; transition: all 0.2s var(--ease-out); font-family: inherit;
+  background: var(--mw-blue); color: white; white-space: nowrap;
+}
+.mini-btn:hover { background: var(--mw-blue-light); transform: translateY(-1px); }
+
 .search-results {
   max-height: 200px; overflow-y: auto; border: 1px solid var(--mw-border);
   border-radius: var(--mw-radius); margin-top: 8px; display: none;
@@ -317,6 +324,7 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
           <th>Department</th>
           <th>Expectation</th>
           <th>Registered</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -330,6 +338,9 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
           <td class="dept-cell">{{ r[5] }}</td>
           <td>{{ r[6] }}</td>
           <td class="date-cell">{{ r[7] }}</td>
+          <td>
+            <button class="mini-btn" onclick="openEditNameModal({{ r[0] }}, '{{ r[1] | replace("'", "\\'") }}')">Edit Name</button>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -440,6 +451,19 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
   </div>
 </div>
 
+<div class="modal-overlay" id="editNameModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeEditNameModal()">&times;</button>
+    <h2>Edit Participant Name</h2>
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="editNameInput" placeholder="e.g. Caleb Emmanuel">
+      <div class="form-hint" style="font-size:.82rem;color:var(--mw-text-muted);margin-top:6px;">Must include first and last name. The certificate is regenerated automatically if one exists.</div>
+    </div>
+    <button type="button" class="btn-submit" id="editNameBtn" onclick="saveEditName()">Save Name</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <button onclick="openRegisterModal()" style="position:fixed;bottom:28px;left:28px;z-index:999;padding:16px 28px;border-radius:var(--mw-radius-lg);background:var(--mw-teal-dark);color:white;font-weight:700;font-size:1rem;border:none;cursor:pointer;box-shadow:var(--mw-shadow-lg);transition:all 0.25s var(--ease-out);font-family:inherit;display:flex;align-items:center;gap:10px;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
@@ -526,6 +550,50 @@ document.getElementById('quickRegForm').addEventListener('submit', function(e) {
 document.getElementById('registerModal').addEventListener('click', function(e) {
   if (e.target === this) closeRegisterModal();
 });
+
+let editRegId = null;
+function openEditNameModal(id, currentName) {
+  editRegId = id;
+  document.getElementById('editNameInput').value = currentName;
+  document.getElementById('editNameModal').classList.add('active');
+  document.getElementById('editNameInput').focus();
+}
+function closeEditNameModal() {
+  document.getElementById('editNameModal').classList.remove('active');
+  editRegId = null;
+}
+document.getElementById('editNameModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditNameModal();
+});
+document.getElementById('editNameInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') saveEditName();
+});
+function saveEditName() {
+  const name = document.getElementById('editNameInput').value.trim();
+  if (!name || editRegId === null) return;
+  if (name.split(/\s+/).filter(Boolean).length < 2) {
+    showToast('Please enter a full name (first and last name).', 'error');
+    return;
+  }
+  const btn = document.getElementById('editNameBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  fetch('/admin/registrations/' + editRegId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({fullname: name})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) { showToast(d.error, 'error'); }
+    else {
+      showToast('Name updated' + (d.certificate_regenerated ? ' (certificate regenerated)' : '') + '.', 'success');
+      closeEditNameModal();
+      setTimeout(() => location.reload(), 900);
+    }
+  })
+  .catch(() => showToast('Network error', 'error'))
+  .finally(() => { btn.disabled = false; btn.textContent = 'Save Name'; });
+}
 
 function showToast(msg, type) {
   const t = document.getElementById('toast');

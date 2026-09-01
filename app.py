@@ -3,6 +3,7 @@ import csv
 import io
 import re
 import secrets
+import smtplib
 from functools import wraps
 from datetime import date, datetime
 
@@ -134,6 +135,12 @@ def ensure_db():
                     created_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'Africa/Lagos')
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS smtp_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
         conn.commit()
     return True
 
@@ -199,6 +206,8 @@ def register():
     required = ["fullname", "email", "phone", "level", "department", "expectation"]
     if not all(data.get(f, "").strip() for f in required):
         return jsonify({"error": "Missing fields"}), 400
+    if not certs.has_full_name(data.get("fullname")):
+        return jsonify({"error": "Please provide your full name (first and last name)."}), 400
 
     try:
         with get_db() as conn:
@@ -206,7 +215,7 @@ def register():
                 cur.execute(
                     "INSERT INTO registrations (fullname, email, phone, level, department, expectation) "
                     "VALUES (%s, %s, %s, %s, %s, %s)",
-                    (data["fullname"].strip(), data["email"].strip().lower(), data["phone"].strip(),
+                    (certs.normalize_name(data["fullname"]), data["email"].strip().lower(), data["phone"].strip(),
                      data["level"], data["department"].strip(), data["expectation"])
                 )
             conn.commit()
@@ -579,7 +588,7 @@ def import_registrations():
                         cur.execute(
                             "INSERT INTO registrations (fullname, email, phone, level, department, expectation) "
                             "VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (LOWER(email)) DO NOTHING",
-                            (name, email, phone, level, dept, expectation)
+                            (certs.normalize_name(name), email, phone, level, dept, expectation)
                         )
                         if cur.rowcount > 0:
                             inserted += 1
@@ -817,6 +826,8 @@ def admin_register_user():
     required = ["fullname", "email", "phone", "level", "department", "expectation"]
     if not all(data.get(f, "").strip() for f in required):
         return jsonify({"error": "All fields are required"}), 400
+    if not certs.has_full_name(data.get("fullname")):
+        return jsonify({"error": "Please provide a full name (first and last name)."}), 400
 
     try:
         with get_db() as conn:
@@ -824,7 +835,7 @@ def admin_register_user():
                 cur.execute(
                     "INSERT INTO registrations (fullname, email, phone, level, department, expectation) "
                     "VALUES (%s, %s, %s, %s, %s, %s)",
-                    (data["fullname"].strip(), data["email"].strip().lower(), data["phone"].strip(),
+                    (certs.normalize_name(data["fullname"]), data["email"].strip().lower(), data["phone"].strip(),
                      data["level"], data["department"].strip(), data["expectation"])
                 )
             conn.commit()
@@ -889,7 +900,8 @@ def admin_certificates():
         settings=settings, has_template=template,
         participants=participants, days=BOOTCAMP_DAYS,
         eligible_count=eligible_count, generated_count=generated_count, sent_count=sent_count,
-        smtp_ok=certs.smtp_configured())
+        smtp_ok=bool(certs.resolve_smtp_config(conn).get("host")),
+        smtp_config=certs.get_smtp_settings(conn))
 
 
 @app.route("/admin/certificates/settings", methods=["POST"])
@@ -1026,10 +1038,11 @@ def certificates_generate_one(reg_id):
 @app.route("/admin/certificates/send/<int:reg_id>", methods=["POST"])
 @admin_required
 def certificates_send_one(reg_id):
-    if not certs.smtp_configured():
-        return jsonify({"error": "SMTP is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASSWORD."}), 400
-
     with get_db() as conn:
+        smtp_config = certs.resolve_smtp_config(conn)
+        if not smtp_config.get("host"):
+            return jsonify({"error": "SMTP is not configured. Set host, username and password in SMTP Settings."}), 400
+
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT c.certificate_pdf, c.certificate_number, r.fullname, r.email "
@@ -1047,7 +1060,7 @@ def certificates_send_one(reg_id):
 
         settings = certs.get_settings(conn)
         try:
-            certs.send_certificate_email(email, certs.normalize_name(fullname), number, bytes(pdf), settings)
+            certs.send_certificate_email(email, certs.normalize_name(fullname), number, bytes(pdf), settings, config=smtp_config)
         except Exception as e:
             return jsonify({"error": f"Email failed: {str(e)[:160]}"}), 500
 
@@ -1146,6 +1159,162 @@ def certificates_eligible_json():
             p["certificate_number"] = i[3] if i else None
             p["skippable"] = certs.is_placeholder_email(p["email"])
     return jsonify(participants)
+
+
+@app.route("/admin/certificates/smtp-settings", methods=["POST"])
+@admin_required
+def certificates_smtp_settings_save():
+    data = request.get_json(force=True)
+    allowed = {
+        "smtp_host", "smtp_port", "smtp_user", "smtp_password",
+        "smtp_from", "smtp_from_name",
+    }
+    values = {}
+    for k in allowed:
+        values[k] = str(data.get(k, "")).strip() if data.get(k) is not None else ""
+    if values["smtp_port"]:
+        try:
+            values["smtp_port"] = str(int(values["smtp_port"]))
+        except ValueError:
+            return jsonify({"error": "SMTP port must be a number."}), 400
+    with get_db() as conn:
+        certs.save_smtp_settings(conn, values)
+    return jsonify({"message": "SMTP settings saved."}), 200
+
+
+@app.route("/admin/certificates/smtp-test", methods=["POST"])
+@admin_required
+def certificates_smtp_test():
+    data = request.get_json(force=True) or {}
+    host = (data.get("smtp_host") or "").strip()
+    port = int(data.get("smtp_port") or "587")
+    user = (data.get("smtp_user") or "").strip()
+    password = (data.get("smtp_password") or "").strip()
+    if not host or not user or not password:
+        return jsonify({"error": "Host, username and password are required to test."}), 400
+    try:
+        with smtplib.SMTP(host, port, timeout=15) as server:
+            server.ehlo()
+            if port in (587, 2525, 465):
+                server.starttls()
+                server.ehlo()
+            server.login(user, password)
+    except Exception as e:
+        return jsonify({"error": f"SMTP test failed: {str(e)[:200]}"}), 400
+    return jsonify({"message": "SMTP connection successful. Ready to send."}), 200
+
+
+@app.route("/admin/registrations/<int:reg_id>", methods=["GET", "PATCH"])
+@admin_required
+def admin_registration_detail(reg_id):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, fullname, email, phone, level, department, expectation, created_at "
+                "FROM registrations WHERE id = %s",
+                (reg_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Registration not found."}), 404
+            cols = ["id", "fullname", "email", "phone", "level", "department", "expectation", "created_at"]
+            reg = dict(zip(cols, row))
+            reg["created_at"] = str(reg["created_at"])
+
+        if request.method == "PATCH":
+            data = request.get_json(force=True)
+            new_name = (data.get("fullname") or "").strip()
+            if not new_name:
+                return jsonify({"error": "Name cannot be empty."}), 400
+            if not certs.has_full_name(new_name):
+                return jsonify({"error": "Please provide a full name (first and last name)."}), 400
+            new_name = certs.normalize_name(new_name)
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE registrations SET fullname = %s WHERE id = %s",
+                    (new_name, reg_id)
+                )
+            conn.commit()
+
+            updated = False
+            if certs.get_template(conn) is not None:
+                settings = certs.get_settings(conn)
+                template = certs.get_template(conn)
+                with conn.cursor() as cur:
+                    cur.execute("SELECT certificate_pdf FROM certificates WHERE registration_id = %s", (reg_id,))
+                    existing = cur.fetchone()
+
+                if existing and existing[0]:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT COUNT(*) FROM attendance WHERE registration_id = %s", (reg_id,))
+                        days = cur.fetchone()[0]
+                        cur.execute(
+                            "SELECT certificate_number FROM certificates WHERE registration_id = %s",
+                            (reg_id,)
+                        )
+                        num_row = cur.fetchone()
+                        if num_row and num_row[0]:
+                            number = num_row[0]
+                        else:
+                            number = certs.assign_next_certificate_number(conn, settings["cert_number_prefix"])
+                        pdf = certs.render_certificate_pdf(template, new_name, settings)
+                        cur.execute(
+                            "INSERT INTO certificates (registration_id, days_attended, eligible, certificate_number, certificate_pdf, generated_at) "
+                            "VALUES (%s, %s, %s, %s, %s, NOW() AT TIME ZONE 'Africa/Lagos') "
+                            "ON CONFLICT (registration_id) DO UPDATE SET certificate_pdf = EXCLUDED.certificate_pdf, "
+                            "certificate_number = COALESCE(certificates.certificate_number, EXCLUDED.certificate_number), "
+                            "generated_at = NOW() AT TIME ZONE 'Africa/Lagos'",
+                            (reg_id, days, days >= int(settings["cert_min_days"]), number, psycopg2.Binary(pdf))
+                        )
+                    conn.commit()
+                    updated = True
+            return jsonify({"message": "Name updated.", "fullname": new_name, "certificate_regenerated": updated}), 200
+
+    return jsonify(reg), 200
+
+
+@app.route("/admin/certificates/preview/<int:reg_id>")
+@admin_required
+def certificates_preview_one(reg_id):
+    with get_db() as conn:
+        template = certs.get_template(conn)
+        if not template:
+            return "No template uploaded yet", 404
+        with conn.cursor() as cur:
+            cur.execute("SELECT fullname FROM registrations WHERE id = %s", (reg_id,))
+            row = cur.fetchone()
+            if not row:
+                return "Registration not found", 404
+            fullname = str(row[0])
+        settings = certs.get_settings(conn)
+        png = certs.render_certificate_png(template, certs.normalize_name(fullname), settings)
+    return app.response_class(png, mimetype="image/png")
+
+
+@app.route("/admin/certificates/gallery")
+@admin_required
+def certificates_gallery():
+    with get_db() as conn:
+        settings = certs.get_settings(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT c.registration_id, r.fullname, c.certificate_number, c.generated_at, c.sent_at "
+                "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
+                "ORDER BY r.fullname ASC"
+            )
+            rows = cur.fetchall()
+    items = [
+        {
+            "registration_id": r[0],
+            "fullname": r[1],
+            "certificate_number": r[2],
+            "generated_at": str(r[3]) if r[3] else None,
+            "sent_at": str(r[4]) if r[4] else None,
+        }
+        for r in rows
+    ]
+    return jsonify(items)
 
 
 if __name__ == "__main__":

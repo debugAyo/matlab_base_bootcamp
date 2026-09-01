@@ -188,6 +188,40 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
 .toast.success { background: #22c55e; color: white; }
 .toast.error { background: var(--mw-red); color: white; }
 
+.preview-modal {
+  background: linear-gradient(135deg, var(--mw-light), var(--mw-light-gray));
+  border: 1px solid var(--mw-border); border-radius: var(--mw-radius-lg);
+  padding: 30px; max-width: 820px; width: 94%; max-height: 92vh; overflow-y: auto;
+  box-shadow: var(--mw-shadow-lg); position: relative;
+}
+.edit-modal {
+  background: linear-gradient(135deg, var(--mw-light), var(--mw-light-gray));
+  border: 1px solid var(--mw-border); border-radius: var(--mw-radius-lg);
+  padding: 30px; max-width: 480px; width: 92%; box-shadow: var(--mw-shadow-lg); position: relative;
+}
+.preview-modal img { display: block; border-radius: 6px; }
+.preview-actions { margin-top: 16px; text-align: center; }
+.preview-actions .btn { justify-content: center; }
+
+.gallery-toolbar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 18px;
+}
+.gallery-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px;
+}
+.gallery-card {
+  border: 1px solid var(--mw-border); border-radius: var(--mw-radius);
+  overflow: hidden; background: #fff; cursor: pointer; transition: all 0.25s var(--ease-out);
+}
+.gallery-card:hover { transform: translateY(-3px); box-shadow: var(--mw-shadow-lg); }
+.gallery-card img { width: 100%; display: block; }
+.gallery-card .g-meta {
+  padding: 12px 14px; background: var(--mw-light); color: var(--mw-text-secondary);
+  font-size: .82rem; font-weight: 600;
+}
+.gallery-card .g-meta .g-name { color: white; display: block; margin-bottom: 3px; }
+
+
 @media(max-width: 900px) {
   .topbar { flex-direction: column; height: auto; padding: 14px 4%; gap: 10px; }
   .setup-grid { grid-template-columns: 1fr; }
@@ -237,9 +271,45 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
 
   {% if not smtp_ok %}
   <div class="warn error">
-    <strong>SMTP not configured.</strong> Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD (plus MAIL_FROM, MAIL_FROM_NAME) in your environment variables to send certificates by email.
+    <strong>SMTP not configured.</strong> Add your SMTP details below (or set SMTP_HOST, SMTP_USER, SMTP_PASSWORD in environment variables) to send certificates by email.
   </div>
   {% endif %}
+
+  <div class="panel" style="margin-bottom:28px;">
+    <h2><span class="num">4</span> SMTP Settings (Email Sending)</h2>
+    <div class="form-row" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="form-group">
+        <label>SMTP Host</label>
+        <input type="text" id="smtpHost" value="{{ smtp_config.smtp_host }}" placeholder="smtp.gmail.com">
+      </div>
+      <div class="form-group">
+        <label>SMTP Port</label>
+        <input type="number" id="smtpPort" value="{{ smtp_config.smtp_port }}">
+      </div>
+      <div class="form-group">
+        <label>SMTP Username</label>
+        <input type="text" id="smtpUser" value="{{ smtp_config.smtp_user }}" placeholder="sender@gmail.com">
+      </div>
+    </div>
+    <div class="form-row" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="form-group">
+        <label>SMTP Password / App Password</label>
+        <input type="password" id="smtpPassword" value="{{ smtp_config.smtp_password }}" placeholder="App password">
+      </div>
+      <div class="form-group">
+        <label>From Address (optional)</label>
+        <input type="text" id="smtpFrom" value="{{ smtp_config.smtp_from }}" placeholder="Blank = username">
+      </div>
+      <div class="form-group">
+        <label>From Name</label>
+        <input type="text" id="smtpFromName" value="{{ smtp_config.smtp_from_name }}">
+      </div>
+    </div>
+    <div class="form-row" style="grid-template-columns:auto auto;">
+      <button class="btn btn-blue" onclick="saveSmtpSettings(event)">Save SMTP Settings</button>
+      <button class="btn btn-ghost" onclick="testSmtp(event)">Test Connection</button>
+    </div>
+  </div>
 
   <div class="setup-grid">
     <div class="panel">
@@ -416,6 +486,10 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
                 <button class="mini-btn green" onclick="sendOne({{ p.registration_id }})">Send Email</button>
                 {% endif %}
               {% endif %}
+              {% if has_template %}
+              <button class="mini-btn primary" onclick="previewCert({{ p.registration_id }}, '{{ p.fullname | replace("'", "\\'") }}')">Preview</button>
+              {% endif %}
+              <button class="mini-btn" onclick="openEditName({{ p.registration_id }}, '{{ p.fullname | replace("'", "\\'") }}')">Edit Name</button>
             </div>
           </td>
         </tr>
@@ -429,6 +503,45 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
     <p>Register participants and mark their attendance first, then generate certificates here.</p>
   </div>
   {% endif %}
+
+  <div class="panel" style="margin-top:28px;">
+    <h2><span class="num">5</span> Certificate Gallery</h2>
+    <div class="gallery-toolbar">
+      <span class="meta" id="galleryCount">Loading...</span>
+      <button class="btn btn-ghost" onclick="loadGallery()">Refresh Gallery</button>
+    </div>
+    <div class="gallery-grid" id="galleryGrid">
+      <div class="preview-missing">Loading generated certificates...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal-overlay" id="previewModal">
+  <div class="preview-modal">
+    <button class="modal-close" id="previewClose">&times;</button>
+    <h3 id="previewTitle" style="color:#fff;margin-bottom:14px;text-align:center;"></h3>
+    <div class="preview-box" style="min-height:0;">
+      <img id="previewModalImg" alt="Certificate preview" style="max-width:100%;">
+    </div>
+    <div class="preview-actions">
+      <a class="btn btn-blue" id="previewDownload" href="#">Download PDF</a>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Name Modal -->
+<div class="modal-overlay" id="editNameModal">
+  <div class="edit-modal">
+    <button class="modal-close" onclick="closeEditNameModal()">&times;</button>
+    <h3 style="color:#fff;margin-bottom:14px;">Edit Participant Name</h3>
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="editNameInput" placeholder="e.g. Caleb Emmanuel">
+    </div>
+    <div class="warn info" style="margin-bottom:14px;">Must include first and last name. The certificate regenerates automatically if one exists.</div>
+    <button class="btn btn-blue" onclick="saveEditName()" style="width:100%;justify-content:center;">Save Name</button>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -592,6 +705,125 @@ function showToast(msg, type) {
   t.className = 'toast ' + type + ' show';
   setTimeout(() => t.classList.remove('show'), 2500);
 }
+
+function saveSmtpSettings(e) {
+  if (e) e.preventDefault();
+  const payload = {
+    smtp_host: document.getElementById('smtpHost').value.trim(),
+    smtp_port: document.getElementById('smtpPort').value.trim(),
+    smtp_user: document.getElementById('smtpUser').value.trim(),
+    smtp_password: document.getElementById('smtpPassword').value,
+    smtp_from: document.getElementById('smtpFrom').value.trim(),
+    smtp_from_name: document.getElementById('smtpFromName').value.trim(),
+  };
+  fetch('/admin/certificates/smtp-settings', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) showToast(d.error, 'error');
+    else showToast(d.message, 'success');
+  })
+  .catch(() => showToast('Network error', 'error'));
+}
+
+function testSmtp(e) {
+  if (e) e.preventDefault();
+  const payload = {
+    smtp_host: document.getElementById('smtpHost').value.trim(),
+    smtp_port: document.getElementById('smtpPort').value.trim(),
+    smtp_user: document.getElementById('smtpUser').value.trim(),
+    smtp_password: document.getElementById('smtpPassword').value,
+  };
+  showToast('Testing connection...', 'success');
+  fetch('/admin/certificates/smtp-test', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) showToast(d.error, 'error');
+    else showToast(d.message, 'success');
+  })
+  .catch(() => showToast('Network error', 'error'));
+}
+
+function loadGallery() {
+  const grid = document.getElementById('galleryGrid');
+  fetch('/admin/certificates/gallery')
+    .then(r => r.json())
+    .then(items => {
+      document.getElementById('galleryCount').textContent = items.length + ' generated certificate(s)';
+      if (items.length === 0) {
+        grid.innerHTML = '<div class="preview-missing">No certificates generated yet.</div>';
+        return;
+      }
+      grid.innerHTML = items.map(it =>
+        '<div class="gallery-card" onclick="previewCert(' + it.registration_id + ',\'' + it.fullname.replace(/'/g, "\\'") + '\')">' +
+          '<img src="/admin/certificates/preview/' + it.registration_id + '?t=' + Date.now() + '" alt="' + it.fullname + '" loading="lazy">' +
+          '<div class="g-meta"><span class="g-name">' + it.fullname + '</span>' + (it.certificate_number || '') + '</div>' +
+        '</div>'
+      ).join('');
+    })
+    .catch(() => { grid.innerHTML = '<div class="preview-missing">Failed to load gallery.</div>'; });
+}
+
+function previewCert(id, name) {
+  const img = document.getElementById('previewModalImg');
+  img.src = '/admin/certificates/preview/' + id + '?t=' + Date.now();
+  document.getElementById('previewTitle').textContent = name || 'Certificate';
+  document.getElementById('previewDownload').href = '/admin/certificates/download/' + id;
+  document.getElementById('previewModal').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+document.getElementById('previewClose').addEventListener('click', function() {
+  document.getElementById('previewModal').classList.remove('active');
+  document.body.style.overflow = '';
+});
+document.getElementById('previewModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    this.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+});
+
+let editRegId = null;
+function openEditName(id, name) {
+  editRegId = id;
+  document.getElementById('editNameInput').value = name;
+  document.getElementById('editNameModal').classList.add('active');
+}
+function closeEditNameModal() {
+  document.getElementById('editNameModal').classList.remove('active');
+  editRegId = null;
+}
+document.getElementById('editNameModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditNameModal();
+});
+function saveEditName() {
+  const name = document.getElementById('editNameInput').value.trim();
+  if (!name || editRegId === null) return;
+  if (name.split(/\s+/).filter(Boolean).length < 2) {
+    showToast('Please enter a full name (first and last name).', 'error');
+    return;
+  }
+  fetch('/admin/registrations/' + editRegId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({fullname: name})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) showToast(d.error, 'error');
+    else {
+      showToast('Name updated' + (d.certificate_regenerated ? ' (certificate regenerated)' : '') + '.', 'success');
+      closeEditNameModal();
+      setTimeout(() => location.reload(), 900);
+    }
+  })
+  .catch(() => showToast('Network error', 'error'));
+}
+
+window.addEventListener('load', loadGallery);
 </script>
 
 </body>
