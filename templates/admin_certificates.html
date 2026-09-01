@@ -133,11 +133,11 @@ body {
 
 .table-wrap {
   background: rgba(255,255,255,0.05); border-radius: var(--mw-radius-lg); box-shadow: var(--mw-shadow);
-  border: 1px solid var(--mw-border); overflow: hidden; backdrop-filter: blur(12px);
+  border: 1px solid var(--mw-border); overflow-x: auto; backdrop-filter: blur(12px);
   animation: tableIn 0.6s var(--ease-out) both;
 }
 @keyframes tableIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-table { width: 100%; border-collapse: collapse; }
+table { width: 100%; border-collapse: collapse; min-width: 1300px; }
 thead { background: linear-gradient(135deg, var(--mw-blue-deeper), var(--mw-blue-dark)); }
 th {
   padding: 16px 18px; text-align: left; font-weight: 600; font-size: .78rem;
@@ -250,8 +250,7 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
   .setup-grid { grid-template-columns: 1fr; }
   .controls-bar { flex-direction: column; align-items: stretch; }
   .controls-bar .meta { margin-right: 0; }
-  .table-wrap { overflow-x: auto; }
-  .table-wrap table { min-width: 1200px; }
+  .table-wrap table { min-width: 1300px; }
   .form-row { grid-template-columns: 1fr; }
 }
 </style>
