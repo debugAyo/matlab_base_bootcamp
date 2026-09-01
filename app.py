@@ -4,6 +4,7 @@ import io
 import re
 import secrets
 import smtplib
+import zipfile
 from functools import wraps
 from datetime import date, datetime
 
@@ -1093,7 +1094,49 @@ def certificates_download(reg_id):
     return app.response_class(
         bytes(pdf),
         mimetype="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=FUTMinna_MATLAB_Certificate_{safe_name}.pdf"}
+        headers={"Content-Disposition": f"attachment; filename={safe_name}_certificate.pdf"}
+    )
+
+
+@app.route("/admin/certificates/download-bulk", methods=["POST"])
+@admin_required
+def certificates_download_bulk():
+    data = request.get_json(force=True)
+    ids = data.get("ids", [])
+    if not ids or not isinstance(ids, list):
+        return jsonify({"error": "No certificate IDs provided."}), 400
+
+    try:
+        ids = [int(i) for i in ids]
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid certificate IDs."}), 400
+
+    buf = io.BytesIO()
+    found = 0
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT c.certificate_pdf, r.fullname "
+                    "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
+                    "WHERE c.registration_id = ANY(%s)",
+                    (ids,)
+                )
+                for pdf_bytes, fullname in cur.fetchall():
+                    if not pdf_bytes:
+                        continue
+                    safe_name = re.sub(r"[^A-Za-z0-9 _-]", "", fullname).replace(" ", "_")
+                    zf.writestr(f"{safe_name}_certificate.pdf", bytes(pdf_bytes))
+                    found += 1
+
+    if found == 0:
+        return jsonify({"error": "No generated certificates found for the selected participants."}), 400
+
+    buf.seek(0)
+    return app.response_class(
+        buf.getvalue(),
+        mimetype="application/zip",
+        headers={"Content-Disposition": "attachment; filename=certificates.zip"}
     )
 
 

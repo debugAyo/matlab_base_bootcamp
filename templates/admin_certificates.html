@@ -221,6 +221,28 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
 }
 .gallery-card .g-meta .g-name { color: white; display: block; margin-bottom: 3px; }
 
+.review-overlay {
+  display: none; position: fixed; inset: 0; z-index: 3000;
+  background: rgba(0,0,0,0.92); backdrop-filter: blur(20px);
+  flex-direction: column; align-items: center; justify-content: center;
+}
+.review-overlay.active { display: flex; }
+.review-container { width: 96%; max-width: 1100px; display: flex; flex-direction: column; gap: 18px; }
+.review-header { display: flex; align-items: center; gap: 16px; }
+.review-body { display: flex; align-items: center; gap: 16px; justify-content: center; }
+.review-canvas { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.review-info { text-align: center; }
+.review-nav {
+  width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--mw-border);
+  background: rgba(255,255,255,0.08); color: white; font-size: 1.8rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;
+}
+.review-nav:hover { background: rgba(255,255,255,0.2); border-color: var(--mw-teal); }
+.review-nav:disabled { opacity: 0.2; cursor: not-allowed; }
+.review-actions { display: flex; gap: 12px; justify-content: center; }
+
+.cert-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: var(--mw-teal); }
+
 
 @media(max-width: 900px) {
   .topbar { flex-direction: column; height: auto; padding: 14px 4%; gap: 10px; }
@@ -340,17 +362,21 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
           <input type="number" id="certMinDays" min="1" max="8" value="{{ settings.cert_min_days }}">
         </div>
       </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="btn btn-ghost" type="button" onclick="testLongName()" style="font-size:.82rem;padding:8px 14px;">Test Long Name</button>
+        <button class="btn btn-ghost" type="button" onclick="testShortName()" style="font-size:.82rem;padding:8px 14px;">Reset Name</button>
+      </div>
       <div class="form-row">
         <div class="form-group">
-          <label>X position (% from left)</label>
+          <label>X position (%) <small style="color:var(--mw-text-muted);">arrows</small></label>
           <input type="number" id="nameX" step="0.5" value="{{ settings.cert_name_x }}">
         </div>
         <div class="form-group">
-          <label>Y position (% from top)</label>
+          <label>Y position (%) <small style="color:var(--mw-text-muted);">arrows</small></label>
           <input type="number" id="nameY" step="0.5" value="{{ settings.cert_name_y }}">
         </div>
         <div class="form-group">
-          <label>Name size (% of width)</label>
+          <label>Name size (%) <small style="color:var(--mw-text-muted);">arrows</small></label>
           <input type="number" id="nameSize" step="0.1" value="{{ settings.cert_name_size }}">
         </div>
       </div>
@@ -405,13 +431,18 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
   </div>
 
   <div class="controls-bar">
+    <span class="meta" id="selectionMeta">0 selected</span>
     <span class="meta">{{ participants|length }} registered &middot; {{ eligible_count }} eligible &middot; {{ generated_count }} generated</span>
     {% if has_template %}
     <button class="btn btn-green" id="generateAllBtn" onclick="generateAll()">Generate All Eligible</button>
     {% endif %}
-    <button class="btn btn-teal" id="sendAllBtn" onclick="sendAll()" {% if not smtp_ok or generated_count == 0 %}disabled{% endif %}>Send Unsent Certificates</button>
-    <a class="btn btn-blue" href="/admin/certificates/export">Export Eligibility CSV</a>
-    <a class="btn btn-ghost" href="/admin/certificates/preview?name={{ 'John Doe' }}" target="_blank">Open Preview</a>
+    <button class="btn btn-teal" id="sendAllBtn" onclick="sendAll()" {% if not smtp_ok or generated_count == 0 %}disabled{% endif %}>Send All Unsent</button>
+    <button class="btn btn-teal" id="sendSelectedBtn" onclick="sendSelected()" disabled>Send Selected</button>
+    <button class="btn btn-blue" id="downloadSelectedBtn" onclick="downloadSelected()" disabled>Download Selected (ZIP)</button>
+    <a class="btn btn-blue" href="/admin/certificates/export">Export CSV</a>
+    {% if has_template %}
+    <button class="btn btn-ghost" onclick="openReviewMode()">Review Certs</button>
+    {% endif %}
   </div>
 
   {% if participants %}
@@ -419,6 +450,7 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
     <table>
       <thead>
         <tr>
+          <th style="width:40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
           <th>Participant</th>
           <th>Email</th>
           <th>Days (D1&ndash;D8)</th>
@@ -432,6 +464,7 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
       <tbody>
         {% for p in participants %}
         <tr id="row-{{ p.registration_id }}">
+          <td><input type="checkbox" class="cert-checkbox" value="{{ p.registration_id }}" onchange="updateSelection()"{% if not p.generated_at %} disabled{% endif %}></td>
           <td class="name-cell">{{ p.fullname }}</td>
           <td class="email-cell">
             {% if p.email and 'placeholder.local' not in p.email %}
@@ -541,6 +574,35 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
     </div>
     <div class="warn info" style="margin-bottom:14px;">Must include first and last name. The certificate regenerates automatically if one exists.</div>
     <button class="btn btn-blue" onclick="saveEditName()" style="width:100%;justify-content:center;">Save Name</button>
+  </div>
+</div>
+
+<!-- Review Mode Overlay -->
+<div class="review-overlay" id="reviewOverlay">
+  <div class="review-container">
+    <div class="review-header">
+      <h3 style="color:white;">Certificate Review</h3>
+      <span id="reviewCounter" style="color:var(--mw-text-muted);font-size:.9rem;">0 / 0</span>
+      <button class="btn btn-ghost" onclick="closeReviewMode()" style="margin-left:auto;">Close</button>
+    </div>
+    <div class="review-body">
+      <button class="review-nav" id="reviewPrev" onclick="reviewPrev()">&#8249;</button>
+      <div class="review-canvas">
+        <img id="reviewImg" alt="Certificate" style="max-width:100%;max-height:70vh;border-radius:8px;">
+        <div class="review-info">
+          <div id="reviewName" style="color:white;font-size:1.2rem;font-weight:700;"></div>
+          <div id="reviewEmail" style="color:var(--mw-blue-light);font-size:.9rem;margin-top:4px;"></div>
+          <div id="reviewNumber" style="color:var(--mw-text-muted);font-size:.85rem;margin-top:4px;font-family:Consolas,monospace;"></div>
+        </div>
+      </div>
+      <button class="review-nav" id="reviewNext" onclick="reviewNext()">&#8250;</button>
+    </div>
+    <div class="review-actions">
+      <a class="btn btn-blue" id="reviewDownload" href="#">Download PDF</a>
+      {% if smtp_ok %}
+      <button class="btn btn-green" id="reviewSendBtn" onclick="reviewSend()">Send Email</button>
+      {% endif %}
+    </div>
   </div>
 </div>
 
@@ -824,6 +886,152 @@ function saveEditName() {
 }
 
 window.addEventListener('load', loadGallery);
+
+['nameX','nameY','nameSize'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      let step = id === 'nameSize' ? 0.1 : 0.5;
+      this.value = (parseFloat(this.value) + step).toFixed(1);
+      updatePreview();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      let step = id === 'nameSize' ? 0.1 : 0.5;
+      this.value = Math.max(0, parseFloat(this.value) - step).toFixed(1);
+      updatePreview();
+    }
+  });
+});
+
+function testLongName() {
+  document.getElementById('sampleName').value = 'Ogheneochuko Desmond Oregbemhe';
+  updatePreview();
+}
+function testShortName() {
+  document.getElementById('sampleName').value = 'John Doe';
+  updatePreview();
+}
+
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.cert-checkbox').forEach(c => {
+    if (!c.disabled) c.checked = cb.checked;
+  });
+  updateSelection();
+}
+function updateSelection() {
+  const checked = document.querySelectorAll('.cert-checkbox:checked');
+  const count = checked.length;
+  document.getElementById('selectionMeta').textContent = count > 0 ? count + ' selected' : '0 selected';
+  document.getElementById('downloadSelectedBtn').disabled = count === 0;
+  document.getElementById('sendSelectedBtn').disabled = count === 0;
+}
+function getSelectedIds() {
+  return Array.from(document.querySelectorAll('.cert-checkbox:checked')).map(c => parseInt(c.value));
+}
+
+function downloadSelected() {
+  const ids = getSelectedIds();
+  if (ids.length === 0) return;
+  showToast('Preparing ZIP for ' + ids.length + ' certificate(s)...', 'success');
+  fetch('/admin/certificates/download-bulk', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ids: ids})
+  })
+  .then(r => {
+    if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Download failed'); });
+    return r.blob();
+  })
+  .then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'certificates.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showToast('ZIP downloaded!', 'success');
+  })
+  .catch(e => showToast(e.message || 'Download failed', 'error'));
+}
+
+function sendSelected() {
+  const ids = getSelectedIds();
+  if (ids.length === 0) return;
+  sendBatch(ids);
+}
+
+function sendBatch(ids) {
+  if (isBusy) return;
+  isBusy = true;
+  showToast('Sending to ' + ids.length + ' participants...', 'success');
+  (async function() {
+    let sent = 0;
+    for (const id of ids) {
+      const r = await fetch('/admin/certificates/send/' + id, {method: 'POST'});
+      const d = await r.json();
+      if (!d.error) {
+        sent++;
+        const cell = document.getElementById('sent-cell-' + id);
+        if (cell) cell.innerHTML = '<span class="badge ok">Sent</span>';
+      }
+      showToast('Progress: ' + sent + '/' + ids.length, 'success');
+    }
+    showToast('Done. Sent ' + sent + ' certificate(s).', 'success');
+    isBusy = false;
+    setTimeout(() => location.reload(), 800);
+  })();
+}
+
+let reviewItems = [];
+let reviewIdx = 0;
+
+function openReviewMode() {
+  fetch('/admin/certificates/gallery')
+    .then(r => r.json())
+    .then(items => {
+      reviewItems = items;
+      reviewIdx = 0;
+      if (reviewItems.length === 0) {
+        showToast('No generated certificates to review.', 'error');
+        return;
+      }
+      document.getElementById('reviewOverlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+      renderReview();
+    });
+}
+function closeReviewMode() {
+  document.getElementById('reviewOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+function renderReview() {
+  const item = reviewItems[reviewIdx];
+  document.getElementById('reviewImg').src = '/admin/certificates/preview/' + item.registration_id + '?t=' + Date.now();
+  document.getElementById('reviewName').textContent = item.fullname;
+  document.getElementById('reviewEmail').textContent = item.email || '';
+  document.getElementById('reviewNumber').textContent = item.certificate_number || '';
+  document.getElementById('reviewCounter').textContent = (reviewIdx + 1) + ' / ' + reviewItems.length;
+  document.getElementById('reviewDownload').href = '/admin/certificates/download/' + item.registration_id;
+  document.getElementById('reviewPrev').disabled = reviewIdx === 0;
+  document.getElementById('reviewNext').disabled = reviewIdx === reviewItems.length - 1;
+}
+function reviewPrev() { if (reviewIdx > 0) { reviewIdx--; renderReview(); } }
+function reviewNext() { if (reviewIdx < reviewItems.length - 1) { reviewIdx++; renderReview(); } }
+function reviewSend() {
+  const item = reviewItems[reviewIdx];
+  showToast('Sending...', 'success');
+  fetch('/admin/certificates/send/' + item.registration_id, {method: 'POST'})
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) showToast(d.error, 'error');
+      else showToast('Sent to ' + (item.email || 'participant') + '.', 'success');
+    })
+    .catch(() => showToast('Network error', 'error'));
+}
+
+document.addEventListener('keydown', function(e) {
+  if (!document.getElementById('reviewOverlay').classList.contains('active')) return;
+  if (e.key === 'Escape') closeReviewMode();
+  else if (e.key === 'ArrowLeft') reviewPrev();
+  else if (e.key === 'ArrowRight') reviewNext();
+});
 </script>
 
 </body>
