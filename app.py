@@ -1346,7 +1346,10 @@ def certificates_preview_one(reg_id):
             fullname = str(row[0])
         settings = certs.get_settings(conn)
         png = certs.render_certificate_png(template, certs.normalize_name(fullname), settings)
-    return app.response_class(png, mimetype="image/png")
+    return app.response_class(png, mimetype="image/png", headers={
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+    })
 
 
 @app.route("/admin/certificates/gallery")
