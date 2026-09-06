@@ -244,6 +244,28 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
 
 .cert-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: var(--mw-teal); }
 
+.search-input {
+  padding: 10px 16px; border: 1.5px solid var(--mw-border); border-radius: var(--mw-radius);
+  font-size: .9rem; font-family: inherit; background: rgba(10,22,41,0.6); color: var(--mw-text);
+  min-width: 250px; flex: 1; max-width: 340px;
+}
+.search-input:focus { outline: none; border-color: var(--mw-teal); box-shadow: 0 0 0 3px rgba(214,48,12,0.12); }
+.search-empty { padding: 40px 20px; text-align: center; color: var(--mw-text-muted); display: none; }
+.send-overlay { display: none; position: fixed; inset: 0; z-index: 1600; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; padding: 20px; }
+.send-overlay.active { display: flex; }
+.send-panel { background: linear-gradient(135deg, var(--mw-light), var(--mw-light-gray)); border: 1px solid var(--mw-border); border-radius: var(--mw-radius-lg); max-width: 520px; width: 100%; padding: 28px; box-shadow: var(--mw-shadow-lg); }
+.send-panel h3 { color: white; margin-bottom: 18px; }
+.sp-bar { height: 14px; background: rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+.sp-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--mw-blue), var(--mw-teal-dark)); border-radius: 10px; transition: width 0.3s var(--ease-out); }
+.sp-status { color: var(--mw-text-secondary); font-size: .9rem; margin-bottom: 12px; font-weight: 600; }
+.sp-failures { display: none; max-height: 180px; overflow-y: auto; margin-bottom: 12px; padding: 8px 12px; border: 1px solid rgba(239,68,68,0.35); border-radius: var(--mw-radius); background: var(--red-soft); }
+.sp-fail { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(239,68,68,0.15); font-size: .85rem; color: #f87171; }
+.sp-fail:last-child { border-bottom: none; }
+.sp-fail strong { color: #fff; flex-shrink: 0; }
+.sp-summary { margin-bottom: 12px; font-weight: 700; font-size: .95rem; }
+.sp-summary.sp-ok { color: #4ade80; }
+.sp-summary.sp-err { color: #f87171; }
+
 
 @media(max-width: 900px) {
   .topbar { flex-direction: column; height: auto; padding: 14px 4%; gap: 10px; }
@@ -434,10 +456,12 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
   <div class="controls-bar">
     <span class="meta" id="selectionMeta">0 selected</span>
     <span class="meta">{{ participants|length }} registered &middot; {{ eligible_count }} eligible &middot; {{ generated_count }} generated</span>
+    <input type="search" id="searchBox" class="search-input" placeholder="Search by name or email..." oninput="filterCertTable(this.value)">
+    <button class="btn btn-ghost" onclick="clearSearch()" style="padding:10px 16px;font-size:.86rem;">Clear</button>
     {% if has_template %}
     <button class="btn btn-green" id="generateAllBtn" onclick="generateAll()">Generate All Eligible</button>
     {% endif %}
-    <button class="btn btn-teal" id="sendAllBtn" onclick="sendAll()" {% if not smtp_ok or generated_count == 0 %}disabled{% endif %}>Send All Unsent</button>
+    <button class="btn btn-teal" id="sendAllBtn" onclick="sendAllEligible()" {% if not smtp_ok or generated_count == 0 %}disabled{% endif %}>Send All Eligible</button>
     <button class="btn btn-teal" id="sendSelectedBtn" onclick="sendSelected()" disabled>Send Selected</button>
     <button class="btn btn-blue" id="downloadSelectedBtn" onclick="downloadSelected()" disabled>Download Selected (ZIP)</button>
     <button class="btn btn-blue" id="downloadAllBtn" onclick="downloadAllEligible()">Download All Eligible (ZIP)</button>
@@ -448,8 +472,8 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
   </div>
 
   {% if participants %}
-  <div class="table-wrap">
-    <table>
+  <div class="table-wrap" style="display:block;">
+    <table id="certTable">
       <thead>
         <tr>
           <th style="width:40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
@@ -465,7 +489,7 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
       </thead>
       <tbody>
         {% for p in participants %}
-        <tr id="row-{{ p.registration_id }}">
+        <tr id="row-{{ p.registration_id }}" data-name="{{ p.fullname }}" data-email="{{ p.email }}">
           <td><input type="checkbox" class="cert-checkbox" value="{{ p.registration_id }}" onchange="updateSelection()"{% if not p.generated_at %} disabled{% endif %}></td>
           <td class="name-cell">{{ p.fullname }}</td>
           <td class="email-cell">
@@ -608,6 +632,18 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
   </div>
 </div>
 
+<!-- Send Progress Overlay -->
+<div class="send-overlay" id="sendProgressOverlay">
+  <div class="send-panel">
+    <h3>Send Certificates</h3>
+    <div class="sp-bar"><div class="sp-fill" id="spFill"></div></div>
+    <div class="sp-status" id="spStatus">Preparing...</div>
+    <div class="sp-failures" id="spFailures"></div>
+    <div class="sp-summary" id="spSummary"></div>
+    <button class="btn btn-blue" id="spClose" onclick="closeSendProgress()" style="width:100%;justify-content:center;">Close</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -728,41 +764,97 @@ function sendOne(id) {
     .catch(() => { showToast('Network error', 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Send Email'; } });
 }
 
-function sendAll() {
+function sendAllEligible() {
   if (isBusy) return;
-  isBusy = true;
   fetch('/admin/certificates/eligible')
     .then(r => r.json())
-    .then(async list => {
+    .then(list => {
       const targets = list.filter(p =>
         p.eligible && p.generated_at && !p.sent_at && !p.skippable
-      );
+      ).map(p => ({ id: p.registration_id, name: p.fullname }));
       if (targets.length === 0) {
-        showToast('Nothing to send.', 'success');
-        isBusy = false;
+        showToast('No eligible unsent certificates to send.', 'success');
         return;
       }
-      showToast('Sending to ' + targets.length + ' participants...', 'success');
-      for (let i = 0; i < targets.length; i++) {
-        const p = targets[i];
-        await fetch('/admin/certificates/send/' + p.registration_id, {method: 'POST'})
-          .then(r => r.json())
-          .then(d => {
-            if (!d.error) {
-              const cell = document.getElementById('sent-cell-' + p.registration_id);
-              if (cell) cell.innerHTML = '<span class="badge ok">Sent</span>';
-            }
-          })
-          .catch(() => {});
-        showToast('Progress: ' + (i + 1) + '/' + targets.length, 'success');
-      }
-      showToast('All unsent certificates processed.', 'success');
-      setTimeout(() => location.reload(), 800);
-      isBusy = false;
+      runSendTasks(targets);
     })
-    .catch(() => { showToast('Failed to load list', 'error'); isBusy = false; });
+    .catch(() => showToast('Failed to load list', 'error'));
 }
 
+function runSendTasks(targets) {
+  if (isBusy) return;
+  if (!targets || targets.length === 0) return;
+  isBusy = true;
+  const total = targets.length;
+  let sent = 0;
+  let failed = 0;
+
+  const overlay = document.getElementById('sendProgressOverlay');
+  const fill = document.getElementById('spFill');
+  const status = document.getElementById('spStatus');
+  const failList = document.getElementById('spFailures');
+  const summary = document.getElementById('spSummary');
+  const closeBtn = document.getElementById('spClose');
+
+  fill.style.width = '0%';
+  failList.innerHTML = '';
+  failList.style.display = 'none';
+  summary.textContent = '';
+  summary.className = '';
+  status.textContent = 'Sending ' + total + ' certificate(s)...';
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  if (closeBtn) { closeBtn.disabled = true; closeBtn.textContent = 'Sending...'; }
+
+  function renderProgress() {
+    const pct = Math.round((sent + failed) / total * 100);
+    fill.style.width = pct + '%';
+    let msg = 'Sent ' + sent + ' of ' + total;
+    if (failed > 0) msg += ' · ' + failed + ' failed';
+    status.textContent = msg;
+  }
+
+  (async () => {
+    for (let i = 0; i < total; i++) {
+      const t = targets[i];
+      status.textContent = 'Sending to ' + t.name + '...';
+      try {
+        const r = await fetch('/admin/certificates/send/' + t.id, { method: 'POST' });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        sent++;
+        const cell = document.getElementById('sent-cell-' + t.id);
+        if (cell) cell.innerHTML = '<span class="badge ok">Sent</span>';
+        const btn = document.querySelector('#actions-' + t.id + ' .mini-btn.green');
+        if (btn) { btn.disabled = true; btn.textContent = 'Sent'; }
+      } catch (e) {
+        failed++;
+        const item = document.createElement('div');
+        item.className = 'sp-fail';
+        item.innerHTML = '<strong>' + t.name + '</strong><span>' + (e.message || 'Network error') + '</span>';
+        failList.appendChild(item);
+        failList.style.display = 'block';
+      }
+      renderProgress();
+    }
+    if (failed === 0) {
+      summary.className = 'sp-ok';
+      summary.textContent = 'Done! Sent ' + sent + ' of ' + total + '.';
+    } else {
+      summary.className = 'sp-err';
+      summary.textContent = 'Completed — Sent ' + sent + ' · Failed ' + failed + '.';
+    }
+    status.textContent = 'Finished.';
+    if (closeBtn) { closeBtn.disabled = false; closeBtn.textContent = 'Close & Reload'; }
+    isBusy = false;
+  })();
+}
+
+function closeSendProgress() {
+  document.getElementById('sendProgressOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+  location.reload();
+}
 function showToast(msg, type) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -914,6 +1006,37 @@ function testShortName() {
   updatePreview();
 }
 
+function filterCertTable(q) {
+  q = (q || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#certTable tbody tr');
+  if (!rows.length) return;
+  let shown = 0;
+  rows.forEach(r => {
+    if (r.classList.contains('search-empty-row')) return;
+    const name = (r.dataset.name || '').toLowerCase();
+    const email = (r.dataset.email || '').toLowerCase();
+    const match = !q || name.includes(q) || email.includes(q);
+    r.style.display = match ? '' : 'none';
+    if (match) shown++;
+  });
+  let empty = document.getElementById('searchEmpty');
+  if (!empty) {
+    empty = document.createElement('tr');
+    empty.className = 'search-empty-row';
+    empty.id = 'searchEmpty';
+    empty.innerHTML = '<td colspan="9" class="search-empty">No participants match your search.</td>';
+    document.querySelector('#certTable tbody').appendChild(empty);
+  }
+  empty.style.display = (q && shown === 0) ? '' : 'none';
+}
+
+function clearSearch() {
+  const box = document.getElementById('searchBox');
+  box.value = '';
+  filterCertTable('');
+  box.focus();
+}
+
 function toggleSelectAll(cb) {
   document.querySelectorAll('.cert-checkbox').forEach(c => {
     if (!c.disabled) c.checked = cb.checked;
@@ -996,26 +1119,13 @@ function sendSelected() {
 
 function sendBatch(ids) {
   if (isBusy) return;
-  isBusy = true;
-  showToast('Sending to ' + ids.length + ' participants...', 'success');
-  (async function() {
-    let sent = 0;
-    for (const id of ids) {
-      const r = await fetch('/admin/certificates/send/' + id, {method: 'POST'});
-      const d = await r.json();
-      if (!d.error) {
-        sent++;
-        const cell = document.getElementById('sent-cell-' + id);
-        if (cell) cell.innerHTML = '<span class="badge ok">Sent</span>';
-      }
-      showToast('Progress: ' + sent + '/' + ids.length, 'success');
-    }
-    showToast('Done. Sent ' + sent + ' certificate(s).', 'success');
-    isBusy = false;
-    setTimeout(() => location.reload(), 800);
-  })();
+  const targets = (ids || []).map(id => {
+    const row = document.getElementById('row-' + id);
+    return { id: id, name: row ? row.dataset.name : 'Participant #' + id };
+  });
+  if (targets.length === 0) return;
+  runSendTasks(targets);
 }
-
 let reviewItems = [];
 let reviewIdx = 0;
 
