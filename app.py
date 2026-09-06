@@ -1378,6 +1378,16 @@ def certificates_gallery():
     return jsonify(items)
 
 
+def _init_schema_on_startup():
+    if DB_AVAILABLE:
+        try:
+            ensure_db()
+        except Exception as e:
+            print(f"WARNING: ensure_db failed during startup: {e}")
+
+
+_init_schema_on_startup()
+
+
 if __name__ == "__main__":
-    ensure_db()
     app.run(debug=True, port=5000)
