@@ -393,6 +393,7 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
             <option value="times" {% if settings.cert_font == 'times' %}selected{% endif %}>Times New Roman</option>
             <option value="arial" {% if settings.cert_font == 'arial' %}selected{% endif %}>Arial</option>
             <option value="arial_bold" {% if settings.cert_font == 'arial_bold' %}selected{% endif %}>Arial (Bold)</option>
+            <option value="space_grotesk" {% if settings.cert_font == 'space_grotesk' %}selected{% endif %}>Space Grotesk (Medium)</option>
           </select>
         </div>
         <div class="form-group">
@@ -439,6 +440,7 @@ tbody tr:hover { background: rgba(59,130,214,0.14); }
     <button class="btn btn-teal" id="sendAllBtn" onclick="sendAll()" {% if not smtp_ok or generated_count == 0 %}disabled{% endif %}>Send All Unsent</button>
     <button class="btn btn-teal" id="sendSelectedBtn" onclick="sendSelected()" disabled>Send Selected</button>
     <button class="btn btn-blue" id="downloadSelectedBtn" onclick="downloadSelected()" disabled>Download Selected (ZIP)</button>
+    <button class="btn btn-blue" id="downloadAllBtn" onclick="downloadAllEligible()">Download All Eligible (ZIP)</button>
     <a class="btn btn-blue" href="/admin/certificates/export">Export CSV</a>
     {% if has_template %}
     <button class="btn btn-ghost" onclick="openReviewMode()">Review Certs</button>
@@ -949,6 +951,41 @@ function downloadSelected() {
     showToast('ZIP downloaded!', 'success');
   })
   .catch(e => showToast(e.message || 'Download failed', 'error'));
+}
+
+function downloadAllEligible() {
+  if (isBusy) return;
+  isBusy = true;
+  const btn = document.getElementById('downloadAllBtn');
+  btn.disabled = true; btn.textContent = 'Preparing...';
+  fetch('/admin/certificates/eligible')
+    .then(r => r.json())
+    .then(list => {
+      const ids = list.filter(p => p.eligible).map(p => p.registration_id);
+      if (ids.length === 0) {
+        showToast('No eligible participants.', 'error');
+        isBusy = false; btn.disabled = false; btn.textContent = 'Download All Eligible (ZIP)';
+        return;
+      }
+      showToast('Preparing ZIP for ' + ids.length + ' certificates...', 'success');
+      return fetch('/admin/certificates/download-bulk', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: ids})
+      }).then(r => {
+        if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Download failed'); });
+        return r.blob();
+      }).then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'all_certificates.zip';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        showToast('Downloaded ' + ids.length + ' certificates!', 'success');
+      });
+    })
+    .catch(e => showToast(e.message || 'Download failed', 'error'))
+    .finally(() => { isBusy = false; btn.disabled = false; btn.textContent = 'Download All Eligible (ZIP)'; });
 }
 
 function sendSelected() {

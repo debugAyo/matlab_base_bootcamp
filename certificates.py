@@ -15,6 +15,7 @@ FONTS = {
     "times": os.path.join(FONT_DIR, "times.ttf"),
     "arial": os.path.join(FONT_DIR, "arial.ttf"),
     "arial_bold": os.path.join(FONT_DIR, "arialbd.ttf"),
+    "space_grotesk": os.path.join(FONT_DIR, "SpaceGrotesk-Medium.ttf"),
 }
 
 CERT_SETTINGS_DEFAULTS = {
@@ -23,7 +24,7 @@ CERT_SETTINGS_DEFAULTS = {
     "cert_name_y": "60",
     "cert_name_size": "3.8",
     "cert_name_color": "000000",
-    "cert_font": "georgia",
+    "cert_font": "space_grotesk",
     "cert_event_name": "FUTMinna MATLAB Space",
     "cert_theme": "Beyond the Code, Decode Your World",
     "cert_number_prefix": "FMNS-2026",
