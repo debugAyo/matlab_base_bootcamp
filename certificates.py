@@ -2,12 +2,20 @@ import io
 import os
 import smtplib
 import re
+from datetime import datetime
 from email.message import EmailMessage
+from zoneinfo import ZoneInfo
 
 from PIL import Image, ImageDraw, ImageFont
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FONT_DIR = os.path.join(BASE_DIR, "fonts")
+
+_LAGOS_TZ = ZoneInfo("Africa/Lagos")
+
+
+def lagos_now():
+    return datetime.now(_LAGOS_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 FONTS = {
     "georgia": os.path.join(FONT_DIR, "georgia.ttf"),
@@ -49,7 +57,7 @@ def save_settings(conn, values):
         for key, value in values.items():
             if key in CERT_SETTINGS_DEFAULTS:
                 cur.execute(
-                    "INSERT INTO settings (key, value) VALUES (%s, %s) "
+                    "INSERT INTO settings (key, value) VALUES (?, ?) "
                     "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
                     (key, str(value)),
                 )
@@ -66,9 +74,9 @@ def get_template(conn):
 def save_template(conn, image_bytes):
     with conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO cert_template (id, image, created_at) VALUES (1, %s, NOW() AT TIME ZONE 'Africa/Lagos') "
-            "ON CONFLICT (id) DO UPDATE SET image = EXCLUDED.image, created_at = NOW() AT TIME ZONE 'Africa/Lagos'",
-            (image_bytes,),
+            "INSERT INTO cert_template (id, image, created_at) VALUES (1, ?, ?) "
+            "ON CONFLICT (id) DO UPDATE SET image = EXCLUDED.image, created_at = EXCLUDED.created_at",
+            (image_bytes, lagos_now()),
         )
     conn.commit()
 
@@ -132,7 +140,7 @@ def save_smtp_settings(conn, values):
         for key, value in values.items():
             if key in SMTP_SETTING_DEFAULTS:
                 cur.execute(
-                    "INSERT INTO smtp_settings (key, value) VALUES (%s, %s) "
+                    "INSERT INTO smtp_settings (key, value) VALUES (?, ?) "
                     "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
                     (key, str(value)),
                 )

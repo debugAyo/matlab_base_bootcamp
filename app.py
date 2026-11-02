@@ -1,18 +1,18 @@
 import os
 import csv
+import hashlib
 import io
 import re
 import secrets
 import smtplib
+import sqlite3
 import zipfile
 from functools import wraps
-from datetime import date, datetime
+from datetime import datetime
 
 from dotenv import load_dotenv
 load_dotenv()
 
-import psycopg2
-import psycopg2.extras
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template, send_from_directory
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -20,6 +20,7 @@ from openpyxl import load_workbook
 from werkzeug.security import generate_password_hash, check_password_hash
 
 import certificates as certs
+from schema import create_schema
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -40,10 +41,20 @@ if not ADMIN_PASSWORD:
     print("WARNING: ADMIN_PASSWORD not set; admin login is disabled until you set it")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    print("WARNING: DATABASE_URL not set; registrations and admin features are disabled until you configure a Postgres connection.")
+if not DATABASE_URL:    
+    print("WARNING: DATABASE_URL not set; registrations and admin features are disabled until you configure a database connection.")
 
 DB_AVAILABLE = bool(DATABASE_URL)
+
+SQLITE_PATH = None
+if DATABASE_URL and DATABASE_URL.startswith("sqlite:"):
+    SQLITE_PATH = DATABASE_URL.split("sqlite:", 1)[1]
+    if SQLITE_PATH.startswith("///"):
+        SQLITE_PATH = SQLITE_PATH[3:]
+    if SQLITE_PATH.startswith("/"):
+        SQLITE_PATH = SQLITE_PATH[1:]
+    if not SQLITE_PATH:
+        SQLITE_PATH = "bootcamp.db"
 
 BOOTCAMP_DAYS = [
     {"number": 1, "date": "2026-08-17", "label": "Day 1 - Mon, Aug 17"},
@@ -60,88 +71,49 @@ BOOTCAMP_DAYS = [
 def get_db():
     if not DB_AVAILABLE:
         raise RuntimeError("DATABASE_URL is not configured.")
-    return psycopg2.connect(DATABASE_URL, sslmode="require")
+    conn = sqlite3.connect(SQLITE_PATH or "bootcamp.db", timeout=30, factory=_SQLiteConn)
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+class _SQLiteConn(sqlite3.Connection):
+    def cursor(self, factory=None):
+        return super().cursor(factory=factory or _SQLiteCursor)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            if exc_type is None:
+                self.commit()
+            else:
+                self.rollback()
+        finally:
+            self.close()
+
+
+class _SQLiteCursor(sqlite3.Cursor):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
 
 def ensure_db():
     if not DB_AVAILABLE:
         return False
     with get_db() as conn:
+        create_schema(conn)
         with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS registrations (
-                    id SERIAL PRIMARY KEY,
-                    fullname TEXT NOT NULL,
-                    email TEXT NOT NULL,
-                    phone TEXT NOT NULL,
-                    level TEXT NOT NULL,
-                    department TEXT NOT NULL,
-                    expectation TEXT NOT NULL,
-                    created_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'Africa/Lagos')
-                )
-            """)
-            cur.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_email_lower "
-                "ON registrations (LOWER(email))"
-            )
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS attendance (
-                    id SERIAL PRIMARY KEY,
-                    registration_id INTEGER NOT NULL REFERENCES registrations(id) ON DELETE CASCADE,
-                    day_number INTEGER NOT NULL,
-                    attendance_date DATE NOT NULL,
-                    marked_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'Africa/Lagos'),
-                    UNIQUE(registration_id, day_number)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS admins (
-                    id SERIAL PRIMARY KEY,
-                    username TEXT NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'admin',
-                    created_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'Africa/Lagos'),
-                    UNIQUE(username)
-                )
-            """)
             cur.execute("SELECT COUNT(*) FROM admins")
             if cur.fetchone()[0] == 0:
                 cur.execute(
-                    "INSERT INTO admins (username, password_hash, role) VALUES (%s, %s, %s)",
-                    ("admin", generate_password_hash(ADMIN_PASSWORD), "super_admin")
+                    "INSERT INTO admins (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+                    ("admin", generate_password_hash(ADMIN_PASSWORD), "super_admin", certs.lagos_now())
                 )
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS certificates (
-                    id SERIAL PRIMARY KEY,
-                    registration_id INTEGER NOT NULL UNIQUE REFERENCES registrations(id) ON DELETE CASCADE,
-                    days_attended INTEGER NOT NULL DEFAULT 0,
-                    eligible BOOLEAN NOT NULL DEFAULT FALSE,
-                    certificate_number TEXT UNIQUE,
-                    certificate_pdf BYTEA,
-                    generated_at TIMESTAMP,
-                    sent_at TIMESTAMP,
-                    created_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'Africa/Lagos')
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS cert_template (
-                    id INTEGER PRIMARY KEY,
-                    image BYTEA NOT NULL,
-                    created_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'Africa/Lagos')
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS smtp_settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                )
-            """)
         conn.commit()
     return True
 
@@ -152,7 +124,7 @@ def admin_required(f):
         if not DB_AVAILABLE:
             return render_template(
                 "admin_login.html",
-                error="DATABASE_URL is not set. Configure a Postgres connection to enable registrations and admin access."
+                error="DATABASE_URL is not set. Configure a database connection to enable registrations and admin access."
             ), 503
         if not session.get("admin_id"):
             return redirect(url_for("admin_login"))
@@ -202,7 +174,7 @@ def serve_image(filename):
 @limiter.limit("5 per minute")
 def register():
     if not DB_AVAILABLE:
-        return jsonify({"error": "DATABASE_URL is not set. Registration is disabled until you configure a Postgres connection."}), 503
+        return jsonify({"error": "DATABASE_URL is not set. Registration is disabled until you configure a database connection."}), 503
     data = request.get_json(force=True)
     required = ["fullname", "email", "phone", "level", "department", "expectation"]
     if not all(data.get(f, "").strip() for f in required):
@@ -214,15 +186,15 @@ def register():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO registrations (fullname, email, phone, level, department, expectation) "
-                    "VALUES (%s, %s, %s, %s, %s, %s)",
+                    "INSERT INTO registrations (fullname, email, phone, level, department, expectation, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (certs.normalize_name(data["fullname"]), data["email"].strip().lower(), data["phone"].strip(),
-                     data["level"], data["department"].strip(), data["expectation"])
+                     data["level"], data["department"].strip(), data["expectation"], certs.lagos_now())
                 )
             conn.commit()
-    except psycopg2.errors.UniqueViolation:
+    except sqlite3.IntegrityError:
         return jsonify({"error": "This email is already registered."}), 409
-    except psycopg2.Error:
+    except sqlite3.Error:
         return jsonify({"error": "Could not save your registration. Please try again."}), 500
 
     return jsonify({"message": "Registration successful"}), 201
@@ -241,7 +213,7 @@ def admin_login():
                 with get_db() as conn:
                     with conn.cursor() as cur:
                         cur.execute(
-                            "SELECT id, username, password_hash, role FROM admins WHERE username = %s",
+                            "SELECT id, username, password_hash, role FROM admins WHERE username = ?",
                             (username,)
                         )
                         admin = cur.fetchone()
@@ -276,16 +248,16 @@ def build_query(filters):
     params = []
 
     if search:
-        query += " AND (fullname ILIKE %s OR email ILIKE %s OR department ILIKE %s OR phone ILIKE %s)"
+        query += " AND (fullname LIKE ? OR email LIKE ? OR department LIKE ? OR phone LIKE ?)"
         like = f"%{search}%"
         params.extend([like, like, like, like])
 
     if level_filter:
-        query += " AND level = %s"
+        query += " AND level = ?"
         params.append(level_filter)
 
     if dept_filter:
-        query += " AND department = %s"
+        query += " AND department = ?"
         params.append(dept_filter)
 
     return query, params
@@ -317,13 +289,13 @@ def admin_dashboard():
             total_pages = max((filtered_count + PER_PAGE - 1) // PER_PAGE, 1)
             page = min(page, total_pages)
 
-            cur.execute(where_query + " ORDER BY id DESC LIMIT %s OFFSET %s", params + [PER_PAGE, (page - 1) * PER_PAGE])
+            cur.execute(where_query + " ORDER BY id DESC LIMIT ? OFFSET ?", params + [PER_PAGE, (page - 1) * PER_PAGE])
             rows = cur.fetchall()
 
             cur.execute("SELECT COUNT(*) FROM registrations")
             total = cur.fetchone()[0]
 
-            cur.execute("SELECT COUNT(*) FROM registrations WHERE created_at::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Lagos')::date")
+            cur.execute("SELECT COUNT(*) FROM registrations WHERE date(created_at) = date(?)", (certs.lagos_now(),))
             today_count = cur.fetchone()[0]
 
             cur.execute("SELECT COUNT(DISTINCT department) FROM registrations WHERE department != ''")
@@ -400,13 +372,13 @@ def admin_attendance():
                 SELECT r.id, r.fullname, r.email, r.phone, r.level, r.department,
                        a.id IS NOT NULL AS attended
                 FROM registrations r
-                LEFT JOIN attendance a ON a.registration_id = r.id AND a.day_number = %s
+                LEFT JOIN attendance a ON a.registration_id = r.id AND a.day_number = ?
                 WHERE 1=1
             """
             params = [selected_day]
 
             if search:
-                query += " AND (r.fullname ILIKE %s OR r.email ILIKE %s OR r.phone ILIKE %s)"
+                query += " AND (r.fullname LIKE ? OR r.email LIKE ? OR r.phone LIKE ?)"
                 like = f"%{search}%"
                 params.extend([like, like, like])
 
@@ -418,7 +390,7 @@ def admin_attendance():
             total_registered = cur.fetchone()[0]
 
             cur.execute(
-                "SELECT COUNT(*) FROM attendance WHERE day_number = %s",
+                "SELECT COUNT(*) FROM attendance WHERE day_number = ?",
                 (selected_day,)
             )
             attended_count = cur.fetchone()[0]
@@ -461,12 +433,12 @@ def mark_attendance():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO attendance (registration_id, day_number, attendance_date) "
-                    "VALUES (%s, %s, %s) ON CONFLICT (registration_id, day_number) DO NOTHING",
-                    (reg_id, day, day_info["date"])
+                    "INSERT INTO attendance (registration_id, day_number, attendance_date, marked_at) "
+                    "VALUES (?, ?, ?, ?) ON CONFLICT (registration_id, day_number) DO NOTHING",
+                    (reg_id, day, day_info["date"], certs.lagos_now())
                 )
             conn.commit()
-    except psycopg2.Error:
+    except sqlite3.Error:
         return jsonify({"error": "Failed to mark attendance"}), 500
 
     return jsonify({"message": "Attendance marked"}), 201
@@ -492,11 +464,11 @@ def unmark_attendance():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "DELETE FROM attendance WHERE registration_id = %s AND day_number = %s",
+                    "DELETE FROM attendance WHERE registration_id = ? AND day_number = ?",
                     (reg_id, day)
                 )
             conn.commit()
-    except psycopg2.Error:
+    except sqlite3.Error:
         return jsonify({"error": "Failed to unmark attendance"}), 500
 
     return jsonify({"message": "Attendance removed"}), 200
@@ -515,7 +487,7 @@ def export_attendance(day):
             cur.execute("""
                 SELECT r.fullname, r.email, r.phone, r.level, r.department
                 FROM registrations r
-                INNER JOIN attendance a ON a.registration_id = r.id AND a.day_number = %s
+                INNER JOIN attendance a ON a.registration_id = r.id AND a.day_number = ?
                 ORDER BY r.fullname ASC
             """, (day,))
             rows = cur.fetchall()
@@ -547,6 +519,8 @@ def import_registrations():
     if not file.filename.endswith((".xlsx", ".xls")):
         return jsonify({"error": "Only Excel files (.xlsx) are supported"}), 400
 
+    fast_issue = request.form.get("fast_issue") == "1"
+
     try:
         wb = load_workbook(file, read_only=True, data_only=True)
         ws = wb.active
@@ -560,9 +534,9 @@ def import_registrations():
         exp_idx = next((i for i, h in enumerate(headers) if h in ("expectation", "expect", "what do you expect")), None)
         email_idx = next((i for i, h in enumerate(headers) if h in ("email", "e-mail", "email address")), None)
 
-        if name_idx is None or phone_idx is None:
+        if name_idx is None:
             wb.close()
-            return jsonify({"error": "Excel must have at least 'name' and 'phone' columns"}), 400
+            return jsonify({"error": "Excel must have a 'name' column (use header: Name, Fullname or Full Name)"}), 400
 
         inserted = 0
         skipped = 0
@@ -572,38 +546,45 @@ def import_registrations():
             with conn.cursor() as cur:
                 for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
                     name = str(row[name_idx]).strip() if row[name_idx] else ""
-                    phone = str(row[phone_idx]).strip() if row[phone_idx] else ""
+                    phone = str(row[phone_idx]).strip() if phone_idx is not None and row[phone_idx] else ""
                     dept = str(row[dept_idx]).strip() if dept_idx is not None and row[dept_idx] else "Other"
                     level = str(row[level_idx]).strip() if level_idx is not None and row[level_idx] else "300"
                     expectation = str(row[exp_idx]).strip() if exp_idx is not None and row[exp_idx] else "Learn MATLAB basics"
                     email = str(row[email_idx]).strip().lower() if email_idx is not None and row[email_idx] else ""
 
-                    if not name or not phone:
+                    if not name:
                         skipped += 1
                         continue
 
                     if not email:
-                        email = f"import_{phone}@placeholder.local"
+                        email = f"import_{hashlib.md5((name + phone).encode()).hexdigest()[:12]}@placeholder.local"
 
                     try:
                         cur.execute(
-                            "INSERT INTO registrations (fullname, email, phone, level, department, expectation) "
-                            "VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (LOWER(email)) DO NOTHING",
-                            (certs.normalize_name(name), email, phone, level, dept, expectation)
+                            "INSERT INTO registrations (fullname, email, phone, level, department, expectation, created_at) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (email) DO NOTHING",
+                            (certs.normalize_name(name), email, phone, level, dept, expectation, certs.lagos_now())
                         )
                         if cur.rowcount > 0:
                             inserted += 1
+                            if fast_issue:
+                                cur.execute(
+                                    "INSERT OR IGNORE INTO attendance (registration_id, day_number, attendance_date, marked_at) "
+                                    "SELECT id, 1, ?, ? FROM registrations WHERE email = ?",
+                                    (BOOTCAMP_DAYS[0]["date"], certs.lagos_now(), email)
+                                )
                         else:
                             skipped += 1
-                    except psycopg2.Error as e:
+                    except sqlite3.Error as e:
                         errors.append(f"Row {row_num}: {str(e)[:80]}")
                         skipped += 1
 
             conn.commit()
         wb.close()
 
+        note = " (fast issue: everyone in the sheet is ready for a certificate)" if fast_issue else ""
         return jsonify({
-            "message": f"Import complete: {inserted} registered, {skipped} skipped",
+            "message": f"Import complete: {inserted} registered, {skipped} skipped.{note}",
             "inserted": inserted,
             "skipped": skipped,
             "errors": errors[:10]
@@ -668,20 +649,20 @@ def import_attendance():
                     reg_id = None
 
                     if email:
-                        cur.execute("SELECT id FROM registrations WHERE LOWER(email) = %s", (email,))
+                        cur.execute("SELECT id FROM registrations WHERE email = ?", (email,))
                         result = cur.fetchone()
                         if result:
                             reg_id = result[0]
 
                     if not reg_id and phone:
-                        cur.execute("SELECT id FROM registrations WHERE phone = %s", (phone,))
+                        cur.execute("SELECT id FROM registrations WHERE phone = ?", (phone,))
                         result = cur.fetchone()
                         if result:
                             reg_id = result[0]
 
                     if not reg_id:
                         cur.execute(
-                            "SELECT id FROM registrations WHERE fullname ILIKE %s",
+                            "SELECT id FROM registrations WHERE fullname LIKE ?",
                             (name,)
                         )
                         result = cur.fetchone()
@@ -690,9 +671,9 @@ def import_attendance():
 
                     if reg_id:
                         cur.execute(
-                            "INSERT INTO attendance (registration_id, day_number, attendance_date) "
-                            "VALUES (%s, %s, %s) ON CONFLICT (registration_id, day_number) DO NOTHING",
-                            (reg_id, day, day_info["date"])
+                            "INSERT INTO attendance (registration_id, day_number, attendance_date, marked_at) "
+                            "VALUES (?, ?, ?, ?) ON CONFLICT (registration_id, day_number) DO NOTHING",
+                            (reg_id, day, day_info["date"], certs.lagos_now())
                         )
                         if cur.rowcount > 0:
                             marked += 1
@@ -733,7 +714,7 @@ def change_password():
                 with get_db() as conn:
                     with conn.cursor() as cur:
                         cur.execute(
-                            "SELECT id, password_hash FROM admins WHERE id = %s",
+                            "SELECT id, password_hash FROM admins WHERE id = ?",
                             (session["admin_id"],)
                         )
                         admin = cur.fetchone()
@@ -741,7 +722,7 @@ def change_password():
                             error = "Current password is incorrect."
                         else:
                             cur.execute(
-                                "UPDATE admins SET password_hash = %s WHERE id = %s",
+                                "UPDATE admins SET password_hash = ? WHERE id = ?",
                                 (generate_password_hash(new_pass), session["admin_id"])
                             )
                             conn.commit()
@@ -780,13 +761,13 @@ def create_admin():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO admins (username, password_hash, role) VALUES (%s, %s, %s)",
-                    (username, generate_password_hash(password), role)
+                    "INSERT INTO admins (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+                    (username, generate_password_hash(password), role, certs.lagos_now())
                 )
             conn.commit()
-    except psycopg2.errors.UniqueViolation:
+    except sqlite3.IntegrityError:
         return jsonify({"error": "Username already exists"}), 409
-    except psycopg2.Error:
+    except sqlite3.Error:
         return jsonify({"error": "Failed to create admin"}), 500
 
     return jsonify({"message": f"Admin '{username}' created successfully"}), 201
@@ -812,9 +793,9 @@ def delete_admin():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM admins WHERE id = %s", (admin_id,))
+                cur.execute("DELETE FROM admins WHERE id = ?", (admin_id,))
             conn.commit()
-    except psycopg2.Error:
+    except sqlite3.Error:
         return jsonify({"error": "Failed to delete admin"}), 500
 
     return jsonify({"message": "Admin deleted"}), 200
@@ -834,15 +815,15 @@ def admin_register_user():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO registrations (fullname, email, phone, level, department, expectation) "
-                    "VALUES (%s, %s, %s, %s, %s, %s)",
+                    "INSERT INTO registrations (fullname, email, phone, level, department, expectation, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (certs.normalize_name(data["fullname"]), data["email"].strip().lower(), data["phone"].strip(),
-                     data["level"], data["department"].strip(), data["expectation"])
+                     data["level"], data["department"].strip(), data["expectation"], certs.lagos_now())
                 )
             conn.commit()
-    except psycopg2.errors.UniqueViolation:
+    except sqlite3.IntegrityError:
         return jsonify({"error": "This email is already registered."}), 409
-    except psycopg2.Error:
+    except sqlite3.Error:
         return jsonify({"error": "Could not save registration."}), 500
 
     return jsonify({"message": "Registration successful"}), 201
@@ -860,7 +841,7 @@ def admin_search_users():
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT id, fullname, email, phone FROM registrations "
-                    "WHERE fullname ILIKE %s OR email ILIKE %s OR phone ILIKE %s LIMIT 10",
+                    "WHERE fullname LIKE ? OR email LIKE ? OR phone LIKE ? LIMIT 10",
                     (f"%{q}%", f"%{q}%", f"%{q}%")
                 )
                 results = [
@@ -978,12 +959,12 @@ def certificates_generate_all():
             number = certs.assign_next_certificate_number(conn, settings["cert_number_prefix"])
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO certificates (registration_id, days_attended, eligible, certificate_number, certificate_pdf, generated_at) "
-                    "VALUES (%s, %s, %s, %s, %s, NOW() AT TIME ZONE 'Africa/Lagos') "
+                    "INSERT INTO certificates (registration_id, days_attended, eligible, certificate_number, certificate_pdf, generated_at, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT (registration_id) DO UPDATE SET certificate_pdf = EXCLUDED.certificate_pdf, "
                     "certificate_number = COALESCE(certificates.certificate_number, EXCLUDED.certificate_number), "
-                    "generated_at = NOW() AT TIME ZONE 'Africa/Lagos'",
-                    (reg_id, p["days_attended"], True, number, psycopg2.Binary(pdf))
+                    "generated_at = EXCLUDED.generated_at",
+                    (reg_id, p["days_attended"], True, number, pdf, certs.lagos_now(), certs.lagos_now())
                 )
             conn.commit()
             generated += 1
@@ -1007,7 +988,7 @@ def certificates_generate_one(reg_id):
 
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT fullname FROM registrations WHERE id = %s",
+                "SELECT fullname FROM registrations WHERE id = ?",
                 (reg_id,)
             )
             row = cur.fetchone()
@@ -1015,7 +996,7 @@ def certificates_generate_one(reg_id):
                 return jsonify({"error": "Participant not found."}), 404
             fullname = certs.normalize_name(row[0])
             cur.execute(
-                "SELECT COUNT(*) FROM attendance WHERE registration_id = %s",
+                "SELECT COUNT(*) FROM attendance WHERE registration_id = ?",
                 (reg_id,)
             )
             days = cur.fetchone()[0]
@@ -1025,12 +1006,12 @@ def certificates_generate_one(reg_id):
 
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO certificates (registration_id, days_attended, eligible, certificate_number, certificate_pdf, generated_at) "
-                "VALUES (%s, %s, %s, %s, %s, NOW() AT TIME ZONE 'Africa/Lagos') "
+                "INSERT INTO certificates (registration_id, days_attended, eligible, certificate_number, certificate_pdf, generated_at, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT (registration_id) DO UPDATE SET certificate_pdf = EXCLUDED.certificate_pdf, "
                 "certificate_number = COALESCE(certificates.certificate_number, EXCLUDED.certificate_number), "
-                "generated_at = NOW() AT TIME ZONE 'Africa/Lagos'",
-                (reg_id, days, days >= int(settings["cert_min_days"]), number, psycopg2.Binary(pdf))
+                "generated_at = EXCLUDED.generated_at",
+                (reg_id, days, days >= int(settings["cert_min_days"]), number, pdf, certs.lagos_now(), certs.lagos_now())
             )
         conn.commit()
     return jsonify({"message": "Certificate generated.", "certificate_number": number}), 200
@@ -1048,7 +1029,7 @@ def certificates_send_one(reg_id):
             cur.execute(
                 "SELECT c.certificate_pdf, c.certificate_number, r.fullname, r.email "
                 "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
-                "WHERE c.registration_id = %s",
+                "WHERE c.registration_id = ?",
                 (reg_id,)
             )
             row = cur.fetchone()
@@ -1067,8 +1048,8 @@ def certificates_send_one(reg_id):
 
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE certificates SET sent_at = NOW() AT TIME ZONE 'Africa/Lagos' WHERE registration_id = %s",
-                (reg_id,)
+                "UPDATE certificates SET sent_at = ? WHERE registration_id = ?",
+                (certs.lagos_now(), reg_id)
             )
         conn.commit()
     return jsonify({"message": f"Certificate sent to {email}."}), 200
@@ -1084,7 +1065,7 @@ def certificates_download(reg_id):
             cur.execute(
                 "SELECT c.certificate_number, r.fullname "
                 "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
-                "WHERE c.registration_id = %s",
+                "WHERE c.registration_id = ?",
                 (reg_id,)
             )
             row = cur.fetchone()
@@ -1129,19 +1110,21 @@ def certificates_download_bulk():
 
         buf = io.BytesIO()
         found = 0
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT r.fullname "
-                    "FROM certificates c JOIN registrations r ON r.id = c.registration_id "
-                    "WHERE c.registration_id = ANY(%s)",
-                    (ids,)
-                )
-                for (fullname,) in cur.fetchall():
-                    pdf = certs.render_certificate_pdf(template, certs.normalize_name(fullname), settings)
-                    safe_name = re.sub(r"[^A-Za-z0-9 _-]", "", fullname).replace(" ", "_")
-                    zf.writestr(f"{safe_name}_certificate.pdf", pdf)
-                    found += 1
+        if ids:
+            placeholders = ",".join("?" * len(ids))
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"SELECT r.fullname "
+                        f"FROM certificates c JOIN registrations r ON r.id = c.registration_id "
+                        f"WHERE c.registration_id IN ({placeholders})",
+                        ids
+                    )
+                    for (fullname,) in cur.fetchall():
+                        pdf = certs.render_certificate_pdf(template, certs.normalize_name(fullname), settings)
+                        safe_name = re.sub(r"[^A-Za-z0-9 _-]", "", fullname).replace(" ", "_")
+                        zf.writestr(f"{safe_name}_certificate.pdf", pdf)
+                        found += 1
 
     if found == 0:
         return jsonify({"error": "No generated certificates found for the selected participants."}), 400
@@ -1151,6 +1134,75 @@ def certificates_download_bulk():
         buf.getvalue(),
         mimetype="application/zip",
         headers={"Content-Disposition": "attachment; filename=certificates.zip"}
+    )
+
+
+@app.route("/admin/certificates/quick")
+@admin_required
+def certificates_quick():
+    with get_db() as conn:
+        has_template = certs.get_template(conn) is not None
+        has_any = False
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM registrations")
+            has_any = cur.fetchone()[0] > 0
+    return render_template("admin_certificates_quick.html", has_template=has_template, has_any=has_any)
+
+
+@app.route("/admin/certificates/quick/build", methods=["POST"])
+@admin_required
+def certificates_quick_build():
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Please enter a name."}), 400
+
+    with get_db() as conn:
+        template = certs.get_template(conn)
+        if not template:
+            return jsonify({"error": "No certificate template uploaded yet."}), 400
+        settings = certs.get_settings(conn)
+        fullname = certs.normalize_name(name)
+        pdf = certs.render_certificate_pdf(template, fullname, settings)
+
+    safe_name = re.sub(r"[^A-Za-z0-9 _-]", "", fullname).replace(" ", "_") or "Certificate"
+    return app.response_class(
+        pdf,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={safe_name}_certificate.pdf",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        }
+    )
+
+
+@app.route("/admin/certificates/quick/bulk", methods=["POST"])
+@admin_required
+def certificates_quick_bulk():
+    with get_db() as conn:
+        template = certs.get_template(conn)
+        if not template:
+            return jsonify({"error": "No certificate template uploaded yet."}), 400
+        settings = certs.get_settings(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT fullname, email FROM registrations ORDER BY fullname ASC")
+            rows = cur.fetchall()
+
+    if not rows:
+        return jsonify({"error": "No names in the database yet. Upload a names spreadsheet first."}), 400
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fullname, email in rows:
+            pdf = certs.render_certificate_pdf(template, certs.normalize_name(fullname), settings)
+            safe_name = re.sub(r"[^A-Za-z0-9 _-]", "", fullname).replace(" ", "_") or "Certificate"
+            zf.writestr(f"{safe_name}_certificate.pdf", pdf)
+
+    buf.seek(0)
+    return app.response_class(
+        buf.getvalue(),
+        mimetype="application/zip",
+        headers={"Content-Disposition": "attachment; filename=all_certificates.zip"}
     )
 
 
@@ -1211,8 +1263,8 @@ def certificates_eligible_json():
             info = {r[0]: r for r in cur.fetchall()}
         for p in participants:
             i = info.get(p["registration_id"])
-            p["generated_at"] = i[2].isoformat() if i and i[2] else None
-            p["sent_at"] = i[1].isoformat() if i and i[1] else None
+            p["generated_at"] = i[2] if i and i[2] else None
+            p["sent_at"] = i[1] if i and i[1] else None
             p["certificate_number"] = i[3] if i else None
             p["skippable"] = certs.is_placeholder_email(p["email"])
     return jsonify(participants)
@@ -1268,7 +1320,7 @@ def admin_registration_detail(reg_id):
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, fullname, email, phone, level, department, expectation, created_at "
-                "FROM registrations WHERE id = %s",
+                "FROM registrations WHERE id = ?",
                 (reg_id,)
             )
             row = cur.fetchone()
@@ -1289,7 +1341,7 @@ def admin_registration_detail(reg_id):
 
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE registrations SET fullname = %s WHERE id = %s",
+                    "UPDATE registrations SET fullname = ? WHERE id = ?",
                     (new_name, reg_id)
                 )
             conn.commit()
@@ -1299,15 +1351,15 @@ def admin_registration_detail(reg_id):
                 settings = certs.get_settings(conn)
                 template = certs.get_template(conn)
                 with conn.cursor() as cur:
-                    cur.execute("SELECT certificate_pdf FROM certificates WHERE registration_id = %s", (reg_id,))
+                    cur.execute("SELECT certificate_pdf FROM certificates WHERE registration_id = ?", (reg_id,))
                     existing = cur.fetchone()
 
                 if existing and existing[0]:
                     with conn.cursor() as cur:
-                        cur.execute("SELECT COUNT(*) FROM attendance WHERE registration_id = %s", (reg_id,))
+                        cur.execute("SELECT COUNT(*) FROM attendance WHERE registration_id = ?", (reg_id,))
                         days = cur.fetchone()[0]
                         cur.execute(
-                            "SELECT certificate_number FROM certificates WHERE registration_id = %s",
+                            "SELECT certificate_number FROM certificates WHERE registration_id = ?",
                             (reg_id,)
                         )
                         num_row = cur.fetchone()
@@ -1317,12 +1369,12 @@ def admin_registration_detail(reg_id):
                             number = certs.assign_next_certificate_number(conn, settings["cert_number_prefix"])
                         pdf = certs.render_certificate_pdf(template, new_name, settings)
                         cur.execute(
-                            "INSERT INTO certificates (registration_id, days_attended, eligible, certificate_number, certificate_pdf, generated_at) "
-                            "VALUES (%s, %s, %s, %s, %s, NOW() AT TIME ZONE 'Africa/Lagos') "
+                            "INSERT INTO certificates (registration_id, days_attended, eligible, certificate_number, certificate_pdf, generated_at, created_at) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?) "
                             "ON CONFLICT (registration_id) DO UPDATE SET certificate_pdf = EXCLUDED.certificate_pdf, "
                             "certificate_number = COALESCE(certificates.certificate_number, EXCLUDED.certificate_number), "
-                            "generated_at = NOW() AT TIME ZONE 'Africa/Lagos'",
-                            (reg_id, days, days >= int(settings["cert_min_days"]), number, psycopg2.Binary(pdf))
+                            "generated_at = EXCLUDED.generated_at",
+                            (reg_id, days, days >= int(settings["cert_min_days"]), number, pdf, certs.lagos_now(), certs.lagos_now())
                         )
                     conn.commit()
                     updated = True
@@ -1339,7 +1391,7 @@ def certificates_preview_one(reg_id):
         if not template:
             return "No template uploaded yet", 404
         with conn.cursor() as cur:
-            cur.execute("SELECT fullname FROM registrations WHERE id = %s", (reg_id,))
+            cur.execute("SELECT fullname FROM registrations WHERE id = ?", (reg_id,))
             row = cur.fetchone()
             if not row:
                 return "Registration not found", 404

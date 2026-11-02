@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick Certificate | FUTMinna MATLAB Space</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --mw-blue: #0747A3; --mw-blue-dark: #052F6B; --mw-blue-deeper: #000000;
+  --mw-blue-light: #4E9BF0; --mw-teal: #D6300C; --mw-teal-dark: #FF6B3D;
+  --mw-yellow: #F26A43; --mw-orange: #D6300C; --mw-red: #A2142F;
+  --mw-white: #FFFFFF; --mw-light: #0A1629; --mw-light-gray: #0E1F3B;
+  --mw-border: rgba(148,163,184,0.18); --mw-text: #E7EDF6;
+  --mw-text-secondary: #A6B4CA; --mw-text-muted: #6B7C96;
+  --mw-shadow: 0 4px 20px rgba(0,0,0,0.25); --mw-shadow-lg: 0 12px 40px rgba(0,0,0,0.35);
+  --mw-radius: 10px; --mw-radius-lg: 16px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif; color: var(--mw-text);
+  background:
+    linear-gradient(180deg, rgba(3,11,24,0.9) 0%, rgba(10,22,41,0.82) 50%, rgba(3,11,24,0.92) 100%),
+    url('/images/decode-your-world-bg.jpg') center/cover no-repeat fixed;
+  background-size: cover; min-height: 100vh;
+}
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 4%; height: 70px;
+  background: linear-gradient(135deg, var(--mw-blue-deeper), var(--mw-blue-dark));
+  color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); backdrop-filter: blur(10px);
+}
+.topbar h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
+.topbar h1 span { color: var(--mw-teal); }
+.topbar-brand { display: flex; align-items: center; gap: 14px; }
+.topbar-logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.2); }
+.topbar nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.topbar nav a {
+  color: rgba(255,255,255,0.7); text-decoration: none; font-size: .88rem; font-weight: 500;
+  padding: 9px 18px; border-radius: 8px; transition: all 0.25s var(--ease-out); white-space: nowrap;
+}
+.topbar nav a:hover { color: white; background: rgba(255,255,255,0.08); }
+.topbar nav a.site-link { border: 1px solid rgba(255,255,255,0.15); }
+.topbar nav a.active-link { background: rgba(255,255,255,0.12); color: white; }
+.topbar nav a.logout-btn { background: var(--mw-red); color: white; font-weight: 600; }
+
+.container { max-width: 700px; margin: 0 auto; padding: 40px 4% 60px; }
+.card {
+  background: rgba(255,255,255,0.05); border: 1px solid var(--mw-border); border-radius: var(--mw-radius-lg);
+  padding: 34px; backdrop-filter: blur(12px); box-shadow: var(--mw-shadow-lg);
+}
+.card h2 { font-size: 1.35rem; margin-bottom: 8px; color: white; }
+.card p { color: var(--mw-text-secondary); font-size: .92rem; margin-bottom: 24px; line-height: 1.5; }
+.form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.input {
+  flex: 1; min-width: 220px; padding: 14px 16px; border-radius: var(--mw-radius);
+  border: 1px solid var(--mw-border); background: rgba(7,71,163,0.12); color: white;
+  font-size: 1rem; outline: none; transition: border-color 0.2s;
+}
+.input::placeholder { color: var(--mw-text-muted); }
+.input:focus { border-color: var(--mw-blue-light); }
+.btn {
+  padding: 14px 26px; border: none; border-radius: var(--mw-radius); cursor: pointer;
+  font-size: .95rem; font-weight: 700; color: white; transition: transform .15s var(--ease-out), opacity .2s;
+  background: linear-gradient(135deg, var(--mw-blue), var(--mw-blue-light));
+}
+.btn:hover { transform: translateY(-1px); opacity: .92; }
+.btn.green { background: linear-gradient(135deg, #15803d, #22c55e); }
+.btn.ghost { background: rgba(255,255,255,0.08); border: 1px solid var(--mw-border); }
+.divider { height: 1px; background: var(--mw-border); margin: 26px 0; border: none; }
+.card ul { padding-left: 20px; color: var(--mw-text-secondary); font-size: .92rem; line-height: 1.7; }
+.card ul b { color: var(--mw-teal-dark); }
+.notice {
+  margin-top: 18px; padding: 14px 16px; border-radius: var(--mw-radius);
+  background: rgba(246,106,67,0.1); border: 1px solid rgba(246,106,67,0.3); color: #fbbf24; font-size: .88rem; line-height: 1.5;
+}
+.notice.ok { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #4ade80; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <img class="topbar-logo" src="/images/futminna_matlab_space_logo.jpeg" alt="FUTMinna MATLAB Space logo">
+    <h1>FUTMinna <span>MATLAB</span> Space &mdash; Quick Generate</h1>
+  </div>
+  <nav>
+    <a href="/admin" class="site-link">Registrations</a>
+    <a href="/admin/attendance" class="site-link">Attendance</a>
+    <a href="/admin/certificates" class="site-link">Certificates</a>
+    <a href="/admin/certificates/quick" class="active-link">Quick Generate</a>
+    {% if admin_role == 'super_admin' %}
+    <a href="/admin/manage-admins">Manage Admins</a>
+    {% endif %}
+    <a href="/admin/change-password">Change Password</a>
+    <a href="/" class="site-link">View Site</a>
+    <a href="/admin/logout" class="logout-btn">Sign Out</a>
+  </nav>
+</div>
+
+<div class="container">
+  <div class="card">
+    <h2>Generate a certificate</h2>
+    <p>Type any participant's name to instantly download their certificate. No registration or attendance needed.</p>
+
+    {% if not has_template %}
+      <div class="notice">
+        <b>Step 1:</b> Upload your certificate template image first &mdash; go to the
+        <a href="/admin/certificates" style="color:#4E9BF0;">Certificates</a> page and use the "Template" uploader.
+      </div>
+    {% endif %}
+
+    <form method="POST" action="/admin/certificates/quick/build">
+      <div class="form-row">
+        <input class="input" type="text" name="name" placeholder="e.g. John Doe" required autocomplete="off">
+        <button class="btn" type="submit">Download PDF</button>
+      </div>
+    </form>
+
+    <hr class="divider">
+
+    <h2 style="font-size:1.1rem;">Bulk download</h2>
+    <p>Generate a ZIP with one certificate for every name currently in the database.</p>
+    <form method="POST" action="/admin/certificates/quick/bulk">
+      <button class="btn green" type="submit">Download all as ZIP</button>
+    </form>
+
+    {% if has_any %}
+    <div class="notice ok">Names are loaded and ready: use the green button to get everyone's certificates in one ZIP.</div>
+    {% else %}
+    <div class="notice">
+      <b>No names yet.</b> Upload your names spreadsheet on the
+      <a href="/admin" style="color:#4E9BF0;">Registrations</a> page (Excel with a "Name" column), then come back here.
+    </div>
+    {% endif %}
+
+    <hr class="divider">
+
+    <h2 style="font-size:1.1rem;">How it works</h2>
+    <ul>
+      <li><b>One name:</b> type it and click <b>Download PDF</b> &mdash; the certificate is generated instantly for that name.</li>
+      <li><b>Everyone:</b> the ZIP button creates one PDF per person using the current template and name style.</li>
+      <li>Names are <a href="/admin/certificates" style="color:#4E9BF0;">styled automatically</a> (position/size/color can be tuned on the Certificates page).</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>
